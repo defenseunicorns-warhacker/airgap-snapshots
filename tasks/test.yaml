@@ -1,0 +1,48 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+# yaml-language-server: $schema=https://raw.githubusercontent.com/defenseunicorns/uds-cli/refs/heads/main/tasks.schema.json
+tasks:
+  - name: all
+    actions:
+      - task: health-check
+      - task: ingress
+      - task: operator-functionality-check
+
+  # Ensure application deploys successfully and becomes available
+  - name: health-check
+    actions:
+      - description: Snapback Health Check
+        wait:
+          cluster:
+            kind: Deployment
+            name: snapback
+            namespace: snapback
+            condition: Available
+
+  - name: ingress
+    actions:
+      - description: "Snapback Ingress Status Check"
+        maxRetries: 30
+        cmd: |
+          STATUS=$(curl -L -o /dev/null -s -w "%{http_code}\n" https://snapback.uds.dev)
+          echo "Snapback system status: ${STATUS}"
+          if [ "$STATUS" != "200" ]; then
+            sleep 10
+            exit 1
+          fi
+
+  - name: operator-functionality-check
+    actions:
+      - description: "Snapback Operator Functionality Check"
+        maxRetries: 30
+        cmd: |
+          # currently the container just prints the current time every 10 seconds
+          # we can check that the operator is running by verifying it logs a timestamp
+          OUTPUT=$(uds zarf tools kubectl logs deployment/snapback -n snapback --tail=1)
+          echo "Operator output: ${OUTPUT}"
+          # validate the output is a "YYYY-MM-DD HH:MM:SS" timestamp
+          if ! echo "${OUTPUT}" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$'; then
+            echo "Output did not match the expected timestamp format"
+            sleep 10
+            exit 1
+          fi

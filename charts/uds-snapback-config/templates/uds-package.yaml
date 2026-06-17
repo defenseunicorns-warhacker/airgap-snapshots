@@ -1,0 +1,26 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
+apiVersion: uds.dev/v1alpha1
+kind: Package
+metadata:
+  name: snapback
+  namespace: {{ .Release.Namespace }}
+# Full Package CR spec reference:
+# https://docs.defenseunicorns.com/core/reference/operator--crds/packages-v1alpha1-cr/
+spec:
+  # Customize network policies and expose services via istio
+  network:
+    serviceMesh:
+      mode: ambient
+    allow:
+      - direction: Ingress
+        remoteGenerated: IntraNamespace
+
+      - direction: Egress
+        remoteGenerated: IntraNamespace
+
+      # Custom rules for unanticipated scenarios
+      {{- with .Values.additionalNetworkAllow }}
+      {{ toYaml . | nindent 6 }}
+      {{- end }}
