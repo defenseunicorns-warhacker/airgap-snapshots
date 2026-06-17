@@ -3,4 +3,4 @@
 
 # Support for custom `network.allow` entries on the Package CR
 # https://docs.defenseunicorns.com/core/how-to-guides/networking/define-network-access/
-additionalNetworkAllow: []
+# additionalNetworkAllow: []

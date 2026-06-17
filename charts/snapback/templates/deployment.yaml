@@ -5,7 +5,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: snapback
-  namespace: {{ .Release.Namespace }}
+  namespace: {{.Release.Namespace}}
   labels:
     app: snapback
 spec:
@@ -20,5 +20,5 @@ spec:
     spec:
       containers:
         - name: snapback
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{.Values.image.repository}}:{{.Values.image.tag}}"
+          imagePullPolicy: {{.Values.image.pullPolicy}}

@@ -5,7 +5,7 @@ apiVersion: uds.dev/v1alpha1
 kind: Package
 metadata:
   name: snapback
-  namespace: {{ .Release.Namespace }}
+  namespace: {{.Release.Namespace}}
 # Full Package CR spec reference:
 # https://docs.defenseunicorns.com/core/reference/operator--crds/packages-v1alpha1-cr/
 spec:
@@ -15,12 +15,12 @@ spec:
       mode: ambient
     allow:
       - direction: Ingress
-        remoteGenerated: IntraNamespace
+        remoteGenerated: Anywhere
 
       - direction: Egress
-        remoteGenerated: IntraNamespace
+        remoteGenerated: Anywhere
 
-      # Custom rules for unanticipated scenarios
-      {{- with .Values.additionalNetworkAllow }}
-      {{ toYaml . | nindent 6 }}
-      {{- end }}
+      # # Custom rules for unanticipated scenarios
+      # {{- with .Values.additionalNetworkAllow }}
+      # {{ toYaml . | nindent 6 }}
+      # {{- end }}
