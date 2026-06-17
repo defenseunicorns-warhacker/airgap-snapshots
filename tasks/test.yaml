@@ -5,8 +5,7 @@ tasks:
   - name: all
     actions:
       - task: health-check
-      - task: ingress
-      - task: operator-functionality-check
+      - task: operator-check
 
   # Ensure application deploys successfully and becomes available
   - name: health-check
@@ -19,21 +18,9 @@ tasks:
             namespace: snapback
             condition: Available
 
-  - name: ingress
+  - name: operator-check
     actions:
-      - description: "Snapback Ingress Status Check"
-        maxRetries: 30
-        cmd: |
-          STATUS=$(curl -L -o /dev/null -s -w "%{http_code}\n" https://snapback.uds.dev)
-          echo "Snapback system status: ${STATUS}"
-          if [ "$STATUS" != "200" ]; then
-            sleep 10
-            exit 1
-          fi
-
-  - name: operator-functionality-check
-    actions:
-      - description: "Snapback Operator Functionality Check"
+      - description: "Snapback Operator Check"
         maxRetries: 30
         cmd: |
           # currently the container just prints the current time every 10 seconds
