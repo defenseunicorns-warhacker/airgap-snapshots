@@ -4,23 +4,23 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ .Values.pvc.name }}
+  name: {{.Values.pvc.name}}
 spec:
   accessModes:
     {{- toYaml .Values.pvc.accessModes | nindent 4 }}
   resources:
     requests:
-      storage: {{ .Values.pvc.storage }}
+      storage: {{.Values.pvc.storage}}
 ---
 apiVersion: v1
 kind: Pod
 metadata:
-  name: {{ .Values.pod.name }}
+  name: {{.Values.pod.name}}
 spec:
   containers:
   - name: log-append-simulator
-    image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-    imagePullPolicy: {{ .Values.image.pullPolicy }}
+    image: "{{.Values.image.repository}}:{{.Values.image.tag}}"
+    imagePullPolicy: {{.Values.image.pullPolicy}}
     command: ["/bin/sh", "-c"]
     args:
       - |
@@ -28,7 +28,7 @@ spec:
         mkdir -p /data/logs
         BASE_TS=1718400000
         LINE_COUNT=0
-        ROTATE_AFTER={{ .Values.simulator.logRotateAfter }}
+        ROTATE_AFTER={{.Values.simulator.logRotateAfter}}
         LOG=/data/logs/app.log
         while true; do
           BURST=$((50 + (LINE_COUNT % 150)))
@@ -76,8 +76,8 @@ spec:
       mountPath: /data
 
   - name: folder-fill-simulator
-    image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-    imagePullPolicy: {{ .Values.image.pullPolicy }}
+    image: "{{.Values.image.repository}}:{{.Values.image.tag}}"
+    imagePullPolicy: {{.Values.image.pullPolicy}}
     command: ["/bin/sh", "-c"]
     args:
       - |
@@ -101,15 +101,15 @@ spec:
               > /data/uploads/events/evt_${TIMESTAMP}_${j}.json
           done
           BATCH_COUNT=$((BATCH_COUNT + 1))
-          sleep {{ .Values.simulator.batchIntervalSeconds }}
+          sleep {{.Values.simulator.batchIntervalSeconds}}
         done
     volumeMounts:
     - name: data-volume
       mountPath: /data
 
   - name: db-iops-simulator
-    image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-    imagePullPolicy: {{ .Values.image.pullPolicy }}
+    image: "{{.Values.image.repository}}:{{.Values.image.tag}}"
+    imagePullPolicy: {{.Values.image.pullPolicy}}
     command: ["/bin/sh", "-c"]
     args:
       - |
@@ -168,4 +168,4 @@ spec:
   volumes:
   - name: data-volume
     persistentVolumeClaim:
-      claimName: {{ .Values.pvc.name }}
+      claimName: {{.Values.pvc.name}}
