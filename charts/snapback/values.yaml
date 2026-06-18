@@ -39,7 +39,7 @@ peat:
   appId: snapback
   # Iroh shared key, base64 (32 bytes). Either set sharedKey here (the chart creates
   # the Secret) OR point existingSharedKeySecret at a Secret with key "shared-key".
-  sharedKey: "gNTCHl9knhEvrfmfiJAo0Te9kcbYnOzet44OpuZ+sko="
+  sharedKey: ""
   existingSharedKeySecret: ""
   irohUdpPort: 51820
   grpcPort: 50051
