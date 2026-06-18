@@ -44,7 +44,7 @@ jobs:
     uses: defenseunicorns/uds-common/.github/workflows/callable-test.yaml@5deb43c3f0d2c7f36d51567151688cf66868af47 # v1.24.13
     with:
       timeout: 30
-      options: --set BASE_REPO="ghcr.io/uds-packages"
+      options: --set BASE_REPO="ghcr.io/defenseunicorns-warhacker"
       runsOn: large-ubuntu-16core
       upgrade-flavors: ${{ needs.check-flavor.outputs.upgrade-flavors }}
       flavor: ${{ matrix.flavor }}

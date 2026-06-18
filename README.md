@@ -14,7 +14,7 @@ This package ships an `upstream` flavor by default. Add `registry1` or `unicorn`
 
 ## Releases
 
-Released packages are available in [GHCR](https://github.com/uds-packages/snapback/pkgs/container/snapback).
+Released packages are available in [GHCR](https://github.com/defenseunicorns-warhacker/airgap-snapshots/pkgs/container/snapback).
 
 ## Local development
 
