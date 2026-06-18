@@ -6,6 +6,7 @@ tasks:
     actions:
       - task: health-check
       - task: operator-check
+      - task: create-backup-io-simulator-package
       - task: backup-io-simulator
 
   # Ensure application deploys successfully and becomes available
@@ -34,7 +35,19 @@ tasks:
             sleep 10
             exit 1
           fi
-  
+
+  - name: create-backup-io-simulator-package
+    description: Build the backup I/O simulator test package archive
+    actions:
+      - description: Create backup-io-simulator package archive
+        dir: tests/backup-io-simulator
+        cmd: |
+          zarf package create --confirm --skip-sbom
+      - description: Deploy backup-io-simulator package archive
+        dir: tests/backup-io-simulator
+        cmd: |
+          zarf package deploy --confirm zarf-package-backup-io-simulator-*.tar.zst
+
   - name: backup-io-simulator
     actions:
       - description: "Deploy backup I/O simulator workload"
