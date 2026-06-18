@@ -42,11 +42,11 @@ tasks:
       - description: Create backup-io-simulator package archive
         dir: tests/backup-io-simulator
         cmd: |
-          zarf package create --confirm --skip-sbom
+          uds zarf package create --confirm --skip-sbom
       - description: Deploy backup-io-simulator package archive
         dir: tests/backup-io-simulator
         cmd: |
-          zarf package deploy --confirm zarf-package-backup-io-simulator-*.tar.zst
+          uds zarf package deploy --confirm zarf-package-backup-io-simulator-*.tar.zst
 
   - name: backup-io-simulator
     actions:
