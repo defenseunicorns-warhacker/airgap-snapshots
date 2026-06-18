@@ -6,6 +6,7 @@ tasks:
     actions:
       - task: health-check
       - task: operator-check
+      - task: backup-io-simulator
 
   # Ensure application deploys successfully and becomes available
   - name: health-check
@@ -31,5 +32,61 @@ tasks:
           if ! echo "${OUTPUT}" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$'; then
             echo "Output did not match the expected timestamp format"
             sleep 10
+            exit 1
+          fi
+  
+  - name: backup-io-simulator
+    actions:
+      - description: "Deploy backup I/O simulator workload"
+        maxRetries: 30
+        cmd: |
+          NS=$(uds zarf tools kubectl get pod --all-namespaces \
+            -o jsonpath='{range .items[?(@.metadata.name=="backup-io-simulator")]}{.metadata.namespace}{"\n"}{end}' \
+            | head -n1)
+
+          if [ -z "${NS}" ]; then
+            echo "backup-io-simulator pod not found yet"
+            sleep 10
+            exit 1
+          fi
+
+          uds zarf tools kubectl wait --for=condition=Ready pod/backup-io-simulator \
+            -n "${NS}" --timeout=120s
+      - description: "Verify backup I/O simulator PVC is receiving data"
+        maxRetries: 12
+        cmd: |
+          WAIT_SECONDS=15
+
+          NS=$(uds zarf tools kubectl get pod --all-namespaces \
+            -o jsonpath='{range .items[?(@.metadata.name=="backup-io-simulator")]}{.metadata.namespace}{"\n"}{end}' \
+            | head -n1)
+
+          if [ -z "${NS}" ]; then
+            echo "backup-io-simulator pod not found"
+            exit 1
+          fi
+
+          if ! uds zarf tools kubectl get pvc test-io-pvc -n "${NS}" >/dev/null 2>&1; then
+            echo "PVC test-io-pvc not found in namespace ${NS}"
+            exit 1
+          fi
+
+          BEFORE=$(uds zarf tools kubectl exec pod/backup-io-simulator -n "${NS}" \
+            -c log-append-simulator -- sh -c 'du -sb /data 2>/dev/null | awk "{print \$1}"')
+
+          sleep "${WAIT_SECONDS}"
+
+          AFTER=$(uds zarf tools kubectl exec pod/backup-io-simulator -n "${NS}" \
+            -c log-append-simulator -- sh -c 'du -sb /data 2>/dev/null | awk "{print \$1}"')
+
+          echo "PVC bytes in ${NS}: before=${BEFORE} after=${AFTER}"
+
+          if [ -z "${BEFORE}" ] || [ -z "${AFTER}" ]; then
+            echo "Unable to read PVC usage from /data"
+            exit 1
+          fi
+
+          if [ "${AFTER}" -le "${BEFORE}" ]; then
+            echo "PVC usage did not grow; expected active writes"
             exit 1
           fi

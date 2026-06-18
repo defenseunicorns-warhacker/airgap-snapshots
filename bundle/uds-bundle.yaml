@@ -40,3 +40,7 @@ packages:
             # the dev bundle since it is built and tagged "just in time"
             - path: image.pullPolicy
               value: Always
+
+  - name: backup-io-simulator-test
+    path: ../tests/backup-io-simulator
+    ref: 0.1.0

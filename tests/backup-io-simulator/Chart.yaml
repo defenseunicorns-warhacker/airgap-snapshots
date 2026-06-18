@@ -1,0 +1,8 @@
+# Public Domain
+# SPDX-License-Identifier: Public-Domain
+
+apiVersion: v2
+name: backup-io-simulator
+description: Helm chart for generating deterministic backup I/O simulation workloads
+type: application
+version: 0.1.0

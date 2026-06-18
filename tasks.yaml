@@ -30,10 +30,21 @@ tasks:
   - name: create-deploy-test-bundle
     description: Test and validate cluster is deployed with the package
     actions:
+      - task: create-backup-io-simulator-package
       - task: create:test-bundle
       - task: deploy:test-bundle
       - task: setup:keycloak-user
       - task: test:all
+
+  - name: create-backup-io-simulator-package
+    description: Build the backup I/O simulator test package archive
+    actions:
+      - description: Create backup-io-simulator package archive
+        cmd: |
+          zarf package create tests/backup-io-simulator \
+            --confirm \
+            --skip-sbom \
+            --output tests/backup-io-simulator
 
   - name: dev
     description: Create and deploy the bundle on an existing cluster (for iteration/dev speed)
