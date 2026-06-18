@@ -1,3 +1,6 @@
+// Copyright 2026 Defense Unicorns
+// SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
 package importer
 
 import (
@@ -45,7 +48,9 @@ func (m *memStore) List(context.Context, string) ([]objstore.ObjectInfo, error) 
 func (m *memStore) Open(context.Context, string) (io.ReadCloser, error) {
 	return nil, errors.New("not used")
 }
+
 func (m *memStore) GetLedger(context.Context, string) ([]byte, string, error) { return nil, "", nil }
+
 func (m *memStore) PutLedger(context.Context, string, []byte, string) (string, error) {
 	return "", nil
 }

@@ -37,3 +37,5 @@ node_modules/
 .mcp.json
 .cursor/mcp.json
 mcp_config.json
+
+hack/

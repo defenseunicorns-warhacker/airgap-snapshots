@@ -17,22 +17,6 @@ tasks:
             name: snapback-source
             namespace: snapback
 
-  - name: operator-check
-    actions:
-      - description: "Snapback Operator Check"
-        maxRetries: 30
-        cmd: |
-          # currently the container just prints the current time every 10 seconds
-          # we can check that the operator is running by verifying it logs a timestamp
-          OUTPUT=$(uds zarf tools kubectl logs deployment/snapback -n snapback --tail=1)
-          echo "Operator output: ${OUTPUT}"
-          # validate the output is a "YYYY-MM-DD HH:MM:SS" timestamp
-          if ! echo "${OUTPUT}" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$'; then
-            echo "Output did not match the expected timestamp format"
-            sleep 10
-            exit 1
-          fi
-
   - name: create-backup-io-simulator-package
     description: Build the backup I/O simulator test package archive
     actions:

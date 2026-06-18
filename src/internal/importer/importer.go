@@ -1,3 +1,6 @@
+// Copyright 2026 Defense Unicorns
+// SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
 // Package importer reconstructs a replicated backup's original BSL object-key
 // layout on the destination, from peat's flattened inbox plus the CRDT manifest
 // (DESIGN §3.5, §12).

@@ -1,3 +1,6 @@
+// Copyright 2026 Defense Unicorns
+// SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
 // Package manifest defines the CRDT document Snapback writes per replication
 // (the "manifest plane", DESIGN §3.5) and the destination importer consumes.
 //
