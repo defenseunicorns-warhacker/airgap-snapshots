@@ -15,6 +15,30 @@ packages:
       velero:
         velero:
           values:
+            - path: extraObjects
+              value:
+                - apiVersion: uds.dev/v1alpha1
+                  kind: Exemption
+                  metadata:
+                    name: snapback-velero-exemptions
+                    namespace: uds-policy-exemptions
+                  spec:
+                    exemptions:
+                      - policies:
+                          - RequireNonRootUser
+                          - RestrictVolumeTypes
+                          - RestrictHostPathWrite
+                        matcher:
+                          namespace: velero
+                          name: "^node-agent.*"
+                          kind: pod
+                        title: "Velero node agent (restic/kopia) hostPath access"
+                        description:
+                          "Velero's deployNodeAgent DaemonSet mounts host pod directories
+                          (/var/lib/kubelet/pods) via hostPath to perform filesystem-level backup and
+                          restore of pod volumes. The hostPath is mounted readOnly during backup. The
+                          upstream velero/node-agent image runs as root (UID 0) and cannot satisfy
+                          RequireNonRootUser without breaking snapshot functionality."
             - path: deployNodeAgent
               value: true
             - path: "configuration.backupStorageLocation"
