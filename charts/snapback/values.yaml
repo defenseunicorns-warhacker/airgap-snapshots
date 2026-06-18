@@ -1,8 +1,87 @@
 # Copyright 2024 Defense Unicorns
 # SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
 
-# Snapback image configuration
+# role selects which side of the replication this release deploys. The same
+# package is deployed to each cluster with a different role:
+#   source      -> controller-manager + peat-node sender sidecar (+ CRDs + RBAC).
+#                  Sits next to Velero; reads the BSL and ships backups.
+#   destination -> peat-node receiver only (cold landing zone, inbox PVC).
+role: source
+
+# Snapback controller-manager image (built from src/ and baked into the package).
 image:
   repository: zarf.internal/snapback-operator
   tag: latest
   pullPolicy: IfNotPresent
+
+manager:
+  # Extra args appended to the manager. Leader election is intentionally off
+  # (single replica) so no lease RBAC is needed.
+  extraArgs: []
+  metricsPort: 8080
+  probePort: 8081
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+# peat-node sidecar/receiver. This is DEPLOYMENT-time config for the peat process
+# itself. The replication TARGET (destination endpointID/addresses/relay, priority,
+# bundle limits) is operator-facing config and lives in the ReplicationPolicy CR.
+peat:
+  image:
+    repository: ghcr.io/defenseunicorns/peat-node
+    tag: v0.3.1
+    pullPolicy: IfNotPresent
+  # appId + sharedKey authenticate peers; they MUST match across source/destination.
+  appId: snapback
+  # Iroh shared key, base64 (32 bytes). Either set sharedKey here (the chart creates
+  # the Secret) OR point existingSharedKeySecret at a Secret with key "shared-key".
+  sharedKey: ""
+  existingSharedKeySecret: ""
+  irohUdpPort: 51820
+  grpcPort: 50051
+  # Retain terminal-bundle handles long enough to outlast the worst-case DDIL
+  # outage (7d). Sized against the outbox PVC.
+  handleRetentionSecs: 604800
+  logLevel: "peat_node=info,peat_node::attachments=debug"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+# Persistent volumes. "" storageClassName uses the cluster default (local-path on k3d-uds).
+storageClassName: ""
+# source: staged backup deltas awaiting destination pull (kept until COMPLETED).
+outbox:
+  size: 100Gi
+# both roles: peat data-dir (stable Iroh endpoint id + blob store + Automerge).
+peatData:
+  size: 50Gi
+# destination: cold DR store of replicated backup objects.
+inbox:
+  size: 500Gi
+
+# Optionally have the chart create a ReplicationPolicy (source role only). Off by
+# default — usually authored after deploy once the destination's Iroh endpoint id
+# is known (see hack/m3/e2e.sh for how that id is discovered). Filling target.* and
+# setting create=true ships it as part of the package instead.
+replicationPolicy:
+  create: false
+  name: ""
+  backupStorageLocations: ["default"]
+  backupSelector: {}
+  target:
+    endpointID: ""
+    addresses: []
+    relayURL: ""
+    nodeID: ""
+  priority: Bulk
+  bundleByteLimit: 1073741824
+  bundleFileLimit: 64
+  maxConcurrentBundles: 4
+  staleAfter: ""

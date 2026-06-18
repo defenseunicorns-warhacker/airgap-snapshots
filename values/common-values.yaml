@@ -1,4 +1,11 @@
 # Copyright 2024 Defense Unicorns
 # SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
 
-# Values common to all flavors
+# Values for the snapback app chart, common to all flavors.
+# role is driven by the package's ROLE Zarf variable (default "source"); Zarf
+# substitutes it into this file at deploy time so a single knob flips both charts.
+role: "###ZARF_VAR_ROLE###"
+
+# NOTE: peat.sharedKey is intentionally NOT set here — production deployments must
+# supply it (and a matching one on the destination) via a bundle override or
+# peat.existingSharedKeySecret. The dev test bundle sets a throwaway key.

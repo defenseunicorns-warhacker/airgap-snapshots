@@ -1,26 +1,88 @@
 # Copyright 2024 Defense Unicorns
 # SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
-
+# UDS Package CR — role-aware network policy + monitoring. Replaces the plain-ns
+# (no default-deny) shortcut used by the hack/m3 e2e harness.
+# Spec: https://docs.defenseunicorns.com/core/reference/operator--crds/packages-v1alpha1-cr/
 apiVersion: uds.dev/v1alpha1
 kind: Package
 metadata:
   name: snapback
-  namespace: {{.Release.Namespace}}
-# Full Package CR spec reference:
-# https://docs.defenseunicorns.com/core/reference/operator--crds/packages-v1alpha1-cr/
+  namespace: {{ .Release.Namespace }}
 spec:
-  # Customize network policies and expose services via istio
   network:
     serviceMesh:
       mode: ambient
     allow:
-      - direction: Ingress
-        remoteGenerated: Anywhere
-
+    {{- if eq .Values.role "source" }}
+      # Controller-manager -> kube-apiserver (watch Backups/BSLs, own CRDs).
       - direction: Egress
-        remoteGenerated: Anywhere
+        remoteGenerated: KubeAPI
+        description: "manager to kube-apiserver"
 
-      # # Custom rules for unanticipated scenarios
-      # {{- with .Values.additionalNetworkAllow }}
-      # {{ toYaml . | nindent 6 }}
-      # {{- end }}
+      # Controller-manager -> Velero BSL object store (MinIO/S3) to read backups.
+      - direction: Egress
+        {{- if .Values.objectStore.remoteCidr }}
+        remoteCidr: {{ .Values.objectStore.remoteCidr | quote }}
+        {{- else if .Values.objectStore.remoteNamespace }}
+        remoteNamespace: {{ .Values.objectStore.remoteNamespace | quote }}
+        {{- else }}
+        remoteGenerated: Anywhere
+        {{- end }}
+        port: {{ .Values.objectStore.port }}
+        remoteProtocol: TCP
+        description: "manager to Velero BSL object store"
+
+      # peat sender <-> destination peer over Iroh QUIC (UDP). Egress to dial the
+      # peer; Ingress because the receiver dials back to pull blobs.
+      - direction: Egress
+        {{- if .Values.peer.remoteCidr }}
+        remoteCidr: {{ .Values.peer.remoteCidr | quote }}
+        {{- else }}
+        remoteGenerated: Anywhere
+        {{- end }}
+        port: {{ .Values.peat.irohUdpPort }}
+        remoteProtocol: UDP
+        description: "peat QUIC egress to destination peer"
+      - direction: Ingress
+        {{- if .Values.peer.remoteCidr }}
+        remoteCidr: {{ .Values.peer.remoteCidr | quote }}
+        {{- else }}
+        remoteGenerated: Anywhere
+        {{- end }}
+        port: {{ .Values.peat.irohUdpPort }}
+        remoteProtocol: UDP
+        description: "peat QUIC ingress from destination peer (pull)"
+    {{- else }}
+      # Destination receiver <-> source over Iroh QUIC (UDP). Ingress to receive
+      # the source's dial; Egress because the receiver dials back to pull blobs.
+      - direction: Ingress
+        {{- if .Values.peer.remoteCidr }}
+        remoteCidr: {{ .Values.peer.remoteCidr | quote }}
+        {{- else }}
+        remoteGenerated: Anywhere
+        {{- end }}
+        port: {{ .Values.peat.irohUdpPort }}
+        remoteProtocol: UDP
+        description: "peat QUIC ingress from source peer"
+      - direction: Egress
+        {{- if .Values.peer.remoteCidr }}
+        remoteCidr: {{ .Values.peer.remoteCidr | quote }}
+        {{- else }}
+        remoteGenerated: Anywhere
+        {{- end }}
+        port: {{ .Values.peat.irohUdpPort }}
+        remoteProtocol: UDP
+        description: "peat QUIC egress to source peer (pull)"
+    {{- end }}
+    {{- with .Values.additionalNetworkAllow }}
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- if and (eq .Values.role "source") .Values.monitor.enabled }}
+  monitor:
+    - selector:
+        app.kubernetes.io/name: snapback
+        app.kubernetes.io/component: source
+      portName: metrics
+      targetPort: {{ .Values.manager.metricsPort }}
+      description: "Snapback controller-manager metrics"
+  {{- end }}

@@ -4,10 +4,12 @@
 kind: UDSBundle
 metadata:
   name: snapback-test
-  description: A UDS bundle for deploying Snapback and its dependencies on a development cluster
+  description: A UDS bundle for deploying Snapback (source role) and its dependencies on a dev cluster
   version: dev
 
 packages:
+  # Velero (+ MinIO BSL) so Snapback has a real BSL to read. The BSL config matches
+  # what the operator + objstore were validated against (uds-dev-stack MinIO).
   - name: core-backup-restore
     repository: ghcr.io/defenseunicorns/packages/uds/core-backup-restore
     ref: 1.6.0-registry1
@@ -54,6 +56,9 @@ packages:
                   credential:
                     name: "velero-bucket-credentials"
                     key: "cloud"
+            # To exercise the bulk Kopia path later, enable the node-agent here:
+            # - path: "deployNodeAgent"
+            #   value: true
 
   - name: snapback
     path: ../
@@ -62,7 +67,10 @@ packages:
       snapback:
         snapback:
           values:
-            # We always want to pull the latest image when deploying
-            # the dev bundle since it is built and tagged "just in time"
+            # Always pull the just-in-time built dev image.
             - path: image.pullPolicy
               value: Always
+            # DEV-ONLY throwaway Iroh shared key (32 zero bytes, base64). Production
+            # bundles MUST set their own and deploy the SAME value to the destination.
+            - path: peat.sharedKey
+              value: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="

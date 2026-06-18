@@ -1,0 +1,43 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+{{- if and (eq .Values.role "source") .Values.replicationPolicy.create }}
+{{- $rp := .Values.replicationPolicy }}
+{{- if not $rp.target.endpointID }}
+{{- fail "snapback: replicationPolicy.create=true requires replicationPolicy.target.endpointID (the destination's Iroh endpoint id)" }}
+{{- end }}
+# Optional packaged ReplicationPolicy. Usually authored post-deploy once the
+# destination's Iroh endpoint id is known; set replicationPolicy.create=true to
+# ship it with the package instead. Cluster-scoped.
+apiVersion: snapback.uds.dev/v1alpha1
+kind: ReplicationPolicy
+metadata:
+  name: {{ $rp.name | default (printf "%s-policy" (include "snapback.name" .)) }}
+  labels:
+    {{- include "snapback.labels" . | nindent 4 }}
+spec:
+  paused: false
+  backupStorageLocations:
+    {{- toYaml $rp.backupStorageLocations | nindent 4 }}
+  backupSelector:
+    matchLabels:
+      {{- toYaml $rp.backupSelector | nindent 6 }}
+  target:
+    endpointID: {{ $rp.target.endpointID | quote }}
+    {{- with $rp.target.addresses }}
+    addresses:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    relayURL: {{ $rp.target.relayURL | quote }}
+    nodeID: {{ $rp.target.nodeID | quote }}
+  priority: {{ $rp.priority }}
+  bundleByteLimit: {{ $rp.bundleByteLimit | int64 }}
+  bundleFileLimit: {{ $rp.bundleFileLimit | int }}
+  maxConcurrentBundles: {{ $rp.maxConcurrentBundles | int }}
+  {{- if $rp.staleAfter }}
+  staleAfter: {{ $rp.staleAfter | quote }}
+  {{- end }}
+  peat:
+    address: "localhost:{{ .Values.peat.grpcPort }}"
+    outboxRoot: outbox
+    outboxPath: /var/lib/peat/outbox
+{{- end }}

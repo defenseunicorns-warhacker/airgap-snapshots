@@ -1,0 +1,31 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+# Headless Service: stable pod DNS (<fullname>-0.<fullname>.<ns>.svc) so a peer can
+# be given a durable host:port for the pinned Iroh UDP endpoint.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "snapback.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "snapback.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    {{- include "snapback.selectorLabels" . | nindent 4 }}
+  ports:
+  - name: iroh-quic
+    port: {{ .Values.peat.irohUdpPort }}
+    targetPort: iroh-quic
+    protocol: UDP
+  {{- if eq .Values.role "source" }}
+  - name: metrics
+    port: {{ .Values.manager.metricsPort }}
+    targetPort: metrics
+    protocol: TCP
+  {{- else }}
+  - name: grpc
+    port: {{ .Values.peat.grpcPort }}
+    targetPort: grpc
+    protocol: TCP
+  {{- end }}

@@ -1,0 +1,50 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+{{- if eq .Values.role "source" }}
+# Least-privilege manager role: watch Velero Backups/BSLs, read the BSL credential
+# Secret, own the snapback CRDs, emit events. Cluster-scoped because BSLs/Backups
+# and the credential Secret live in the Velero namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "snapback.fullname" . }}-manager
+  labels:
+    {{- include "snapback.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: [events]
+  verbs: [create, patch]
+- apiGroups: [""]
+  resources: [secrets]
+  verbs: [get, list, watch]
+- apiGroups: [snapback.uds.dev]
+  resources: [backupreplications]
+  verbs: [create, delete, get, list, patch, update, watch]
+- apiGroups: [snapback.uds.dev]
+  resources: [backupreplications/finalizers]
+  verbs: [update]
+- apiGroups: [snapback.uds.dev]
+  resources: [backupreplications/status, replicationpolicies/status]
+  verbs: [get, patch, update]
+- apiGroups: [snapback.uds.dev]
+  resources: [replicationpolicies]
+  verbs: [get, list, watch]
+- apiGroups: [velero.io]
+  resources: [backups, backupstoragelocations]
+  verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "snapback.fullname" . }}-manager
+  labels:
+    {{- include "snapback.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "snapback.fullname" . }}-manager
+subjects:
+- kind: ServiceAccount
+  name: {{ include "snapback.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}
