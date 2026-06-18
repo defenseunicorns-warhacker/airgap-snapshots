@@ -1,0 +1,117 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+{{- if eq .Values.role "source" }}
+# Source: controller-manager + peat-node sender sidecar sharing an outbox PVC.
+# StatefulSet so the peat data-dir (stable Iroh endpoint id) and the outbox (staged
+# blobs awaiting destination pull through a DDIL outage) are durable PVCs.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "snapback.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "snapback.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "snapback.fullname" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "snapback.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "snapback.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "snapback.serviceAccountName" . }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532 # shared outbox PVC writable by both containers
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      # --- Snapback controller-manager ---
+      - name: manager
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args:
+        - --health-probe-bind-address=:{{ .Values.manager.probePort }}
+        - --metrics-bind-address=:{{ .Values.manager.metricsPort }}
+        {{- with .Values.manager.extraArgs }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        ports:
+        - { name: metrics, containerPort: {{ .Values.manager.metricsPort }} }
+        - { name: probe, containerPort: {{ .Values.manager.probePort }} }
+        livenessProbe:
+          httpGet: { path: /healthz, port: {{ .Values.manager.probePort }} }
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet: { path: /readyz, port: {{ .Values.manager.probePort }} }
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities: { drop: ["ALL"] }
+        resources:
+          {{- toYaml .Values.manager.resources | nindent 10 }}
+        volumeMounts:
+        - { name: outbox, mountPath: /var/lib/peat/outbox }
+        - { name: tmp, mountPath: /tmp }
+      # --- peat-node sender sidecar ---
+      - name: peat-node
+        image: "{{ .Values.peat.image.repository }}:{{ .Values.peat.image.tag }}"
+        imagePullPolicy: {{ .Values.peat.image.pullPolicy }}
+        env:
+        - { name: PEAT_NODE_LISTEN, value: "tcp://127.0.0.1:{{ .Values.peat.grpcPort }}" }
+        - { name: PEAT_NODE_DATA_DIR, value: "/data/peat-node" }
+        - { name: PEAT_NODE_NODE_ID, value: {{ include "snapback.fullname" . | quote }} }
+        - { name: PEAT_NODE_APP_ID, value: {{ .Values.peat.appId | quote }} }
+        - name: PEAT_NODE_SHARED_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "snapback.sharedKeySecretName" . }}
+              key: shared-key
+        - { name: PEAT_NODE_IROH_UDP_PORT, value: {{ .Values.peat.irohUdpPort | quote }} }
+        - { name: PEAT_NODE_ATTACHMENT_ROOT, value: "outbox=/var/lib/peat/outbox" }
+        - { name: PEAT_NODE_ATTACHMENT_DEFAULT_PRIORITY, value: "bulk" }
+        - { name: PEAT_NODE_ATTACHMENT_HANDLE_RETENTION_SECS, value: {{ .Values.peat.handleRetentionSecs | quote }} }
+        - { name: PEAT_NODE_AUTO_SYNC, value: "true" }
+        - { name: RUST_LOG, value: {{ .Values.peat.logLevel | quote }} }
+        ports:
+        - { name: iroh-quic, containerPort: {{ .Values.peat.irohUdpPort }}, protocol: UDP }
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: { drop: ["ALL"] }
+        resources:
+          {{- toYaml .Values.peat.resources | nindent 10 }}
+        volumeMounts:
+        - { name: outbox, mountPath: /var/lib/peat/outbox }
+        - { name: peat-data, mountPath: /data/peat-node }
+      volumes:
+      - { name: tmp, emptyDir: {} }
+  volumeClaimTemplates:
+  - metadata:
+      name: outbox
+    spec:
+      accessModes: [ReadWriteOnce]
+      {{- if .Values.storageClassName }}
+      storageClassName: {{ .Values.storageClassName }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.outbox.size }}
+  - metadata:
+      name: peat-data
+    spec:
+      accessModes: [ReadWriteOnce]
+      {{- if .Values.storageClassName }}
+      storageClassName: {{ .Values.storageClassName }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.peatData.size }}
+{{- end }}

@@ -17,6 +17,10 @@ metadata:
 variables:
   - name: DOMAIN
     default: "uds.dev"
+  # ROLE selects which side this deployment is. Drives both the config chart
+  # (network policy) and the app chart (workloads). source | destination.
+  - name: ROLE
+    default: "source"
 
 components:
   - name: snapback
@@ -24,12 +28,14 @@ components:
     only:
       flavor: upstream
     charts:
+      # Config chart (UDS Package CR: netpol + monitoring) deploys first.
       - name: uds-snapback-config
         namespace: snapback
         version: 0.1.0
         localPath: charts/uds-snapback-config/
         valuesFiles:
-          - values/common-values.yaml
+          - values/common-uds-values.yaml
+      # App chart (CRDs, RBAC, the role-appropriate workloads).
       - name: snapback
         namespace: snapback
         version: 0.1.0
@@ -44,13 +50,17 @@ components:
               docker buildx create --use \
                 --name uds-builder \
                 --driver docker-container || true
-          - description: Build container images for package
+          - description: Build the Snapback controller-manager image
             cmd: |
               docker buildx build src/ \
                 --builder=uds-builder \
                 --platform=linux/amd64,linux/arm64 \
                 --tag=zarf.internal/snapback-operator:latest \
                 --output=type=oci,dest=images.tar
+    # peat-node is pulled from upstream and baked into the package (airgap).
+    images:
+      - ghcr.io/defenseunicorns/peat-node:v0.3.1
+    # The locally-built controller-manager image (OCI archive from buildx above).
     imageArchives:
       - path: images.tar
         images:

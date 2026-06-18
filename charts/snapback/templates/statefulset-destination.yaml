@@ -1,0 +1,83 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+{{- if eq .Values.role "destination" }}
+# Destination (v1 cold landing zone): peat-node receiver only. The attachment
+# inbox watcher pulls distributions and writes files to the inbox PVC. No Snapback
+# component runs here in v1 (no BSL reconstruction, no restore). gRPC listens on
+# 0.0.0.0 so the source can be peered in (ConnectPeer) during bring-up.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "snapback.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "snapback.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "snapback.fullname" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "snapback.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "snapback.selectorLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: peat-node
+        image: "{{ .Values.peat.image.repository }}:{{ .Values.peat.image.tag }}"
+        imagePullPolicy: {{ .Values.peat.image.pullPolicy }}
+        env:
+        - { name: PEAT_NODE_LISTEN, value: "tcp://0.0.0.0:{{ .Values.peat.grpcPort }}" }
+        - { name: PEAT_NODE_DATA_DIR, value: "/data/peat-node" }
+        - { name: PEAT_NODE_NODE_ID, value: {{ include "snapback.fullname" . | quote }} }
+        - { name: PEAT_NODE_APP_ID, value: {{ .Values.peat.appId | quote }} }
+        - name: PEAT_NODE_SHARED_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "snapback.sharedKeySecretName" . }}
+              key: shared-key
+        - { name: PEAT_NODE_IROH_UDP_PORT, value: {{ .Values.peat.irohUdpPort | quote }} }
+        - { name: PEAT_NODE_ATTACHMENT_INBOX, value: "/var/lib/peat/inbox" }
+        - { name: PEAT_NODE_AUTO_SYNC, value: "true" }
+        - { name: RUST_LOG, value: {{ .Values.peat.logLevel | quote }} }
+        ports:
+        - { name: grpc, containerPort: {{ .Values.peat.grpcPort }} }
+        - { name: iroh-quic, containerPort: {{ .Values.peat.irohUdpPort }}, protocol: UDP }
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: { drop: ["ALL"] }
+        resources:
+          {{- toYaml .Values.peat.resources | nindent 10 }}
+        volumeMounts:
+        - { name: inbox, mountPath: /var/lib/peat/inbox }
+        - { name: peat-data, mountPath: /data/peat-node }
+  volumeClaimTemplates:
+  - metadata:
+      name: inbox
+    spec:
+      accessModes: [ReadWriteOnce]
+      {{- if .Values.storageClassName }}
+      storageClassName: {{ .Values.storageClassName }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.inbox.size }}
+  - metadata:
+      name: peat-data
+    spec:
+      accessModes: [ReadWriteOnce]
+      {{- if .Values.storageClassName }}
+      storageClassName: {{ .Values.storageClassName }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.peatData.size }}
+{{- end }}

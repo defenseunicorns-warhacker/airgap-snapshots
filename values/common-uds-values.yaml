@@ -1,4 +1,6 @@
 # Copyright 2025 Defense Unicorns
 # SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
 
-# Values common to all flavors for the UDS Package CR chart
+# Values for the uds-snapback-config (UDS Package CR) chart, common to all flavors.
+# Kept in lockstep with the app chart's role via the ROLE Zarf variable.
+role: "###ZARF_VAR_ROLE###"
