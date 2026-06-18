@@ -1,9 +1,16 @@
 # Copyright 2024 Defense Unicorns
 # SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
-{{- if eq .Values.role "source" }}
+{{- $isSource := eq .Values.role "source" }}
+{{- if $isSource }}
 # Source: controller-manager + peat-node sender sidecar sharing an outbox PVC.
 # StatefulSet so the peat data-dir (stable Iroh endpoint id) and the outbox (staged
 # blobs awaiting destination pull through a DDIL outage) are durable PVCs.
+{{- else }}
+# Destination (v1 cold landing zone): peat-node receiver only. The attachment
+# inbox watcher pulls distributions and writes files to the inbox PVC. No Snapback
+# component runs here in v1 (no BSL reconstruction, no restore). gRPC listens on
+# 0.0.0.0 so the source can be peered in (ConnectPeer) during bring-up.
+{{- end }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -22,15 +29,18 @@ spec:
       labels:
         {{- include "snapback.selectorLabels" . | nindent 8 }}
     spec:
+      {{- if $isSource }}
       serviceAccountName: {{ include "snapback.serviceAccountName" . }}
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
         runAsGroup: 65532
-        fsGroup: 65532 # shared outbox PVC writable by both containers
+        fsGroup: 65532 {{- if $isSource }} # shared outbox PVC writable by both containers{{- end }}
         seccompProfile:
           type: RuntimeDefault
       containers:
+      {{- if $isSource }}
       # --- Snapback controller-manager ---
       - name: manager
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -63,11 +73,18 @@ spec:
         - { name: outbox, mountPath: /var/lib/peat/outbox }
         - { name: tmp, mountPath: /tmp }
       # --- peat-node sender sidecar ---
+      {{- else }}
+      # --- peat-node receiver ---
+      {{- end }}
       - name: peat-node
         image: "{{ .Values.peat.image.repository }}:{{ .Values.peat.image.tag }}"
         imagePullPolicy: {{ .Values.peat.image.pullPolicy }}
         env:
+        {{- if $isSource }}
         - { name: PEAT_NODE_LISTEN, value: "tcp://127.0.0.1:{{ .Values.peat.grpcPort }}" }
+        {{- else }}
+        - { name: PEAT_NODE_LISTEN, value: "tcp://0.0.0.0:{{ .Values.peat.grpcPort }}" }
+        {{- end }}
         - { name: PEAT_NODE_DATA_DIR, value: "/data/peat-node" }
         - { name: PEAT_NODE_NODE_ID, value: {{ include "snapback.fullname" . | quote }} }
         - { name: PEAT_NODE_APP_ID, value: {{ .Values.peat.appId | quote }} }
@@ -77,12 +94,19 @@ spec:
               name: {{ include "snapback.sharedKeySecretName" . }}
               key: shared-key
         - { name: PEAT_NODE_IROH_UDP_PORT, value: {{ .Values.peat.irohUdpPort | quote }} }
+        {{- if $isSource }}
         - { name: PEAT_NODE_ATTACHMENT_ROOT, value: "outbox=/var/lib/peat/outbox" }
         - { name: PEAT_NODE_ATTACHMENT_DEFAULT_PRIORITY, value: "bulk" }
         - { name: PEAT_NODE_ATTACHMENT_HANDLE_RETENTION_SECS, value: {{ .Values.peat.handleRetentionSecs | quote }} }
+        {{- else }}
+        - { name: PEAT_NODE_ATTACHMENT_INBOX, value: "/var/lib/peat/inbox" }
+        {{- end }}
         - { name: PEAT_NODE_AUTO_SYNC, value: "true" }
         - { name: RUST_LOG, value: {{ .Values.peat.logLevel | quote }} }
         ports:
+        {{- if not $isSource }}
+        - { name: grpc, containerPort: {{ .Values.peat.grpcPort }} }
+        {{- end }}
         - { name: iroh-quic, containerPort: {{ .Values.peat.irohUdpPort }}, protocol: UDP }
         securityContext:
           allowPrivilegeEscalation: false
@@ -90,11 +114,18 @@ spec:
         resources:
           {{- toYaml .Values.peat.resources | nindent 10 }}
         volumeMounts:
+        {{- if $isSource }}
         - { name: outbox, mountPath: /var/lib/peat/outbox }
+        {{- else }}
+        - { name: inbox, mountPath: /var/lib/peat/inbox }
+        {{- end }}
         - { name: peat-data, mountPath: /data/peat-node }
+      {{- if $isSource }}
       volumes:
       - { name: tmp, emptyDir: {} }
+      {{- end }}
   volumeClaimTemplates:
+  {{- if $isSource }}
   - metadata:
       name: outbox
     spec:
@@ -105,6 +136,18 @@ spec:
       resources:
         requests:
           storage: {{ .Values.outbox.size }}
+  {{- else }}
+  - metadata:
+      name: inbox
+    spec:
+      accessModes: [ReadWriteOnce]
+      {{- if .Values.storageClassName }}
+      storageClassName: {{ .Values.storageClassName }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.inbox.size }}
+  {{- end }}
   - metadata:
       name: peat-data
     spec:
@@ -115,4 +158,3 @@ spec:
       resources:
         requests:
           storage: {{ .Values.peatData.size }}
-{{- end }}
