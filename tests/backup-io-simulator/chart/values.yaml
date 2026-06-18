@@ -1,0 +1,26 @@
+# Public Domain
+# SPDX-License-Identifier: Public-Domain
+
+# backup IO simulator image
+image:
+  repository: alpine
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# PersistentVolumeClaim (PVC) configuration
+pvc:
+  name: test-io-pvc
+  accessModes:
+    - ReadWriteOnce
+  storage: 10Gi
+
+# Pod configuration
+pod:
+  name: backup-io-simulator
+
+# Configurable parameters for generating realistic I/O patterns
+simulator:
+  logRotateAfter: 10000
+  batchIntervalSeconds: 5
+  dbCheckpointEvery: 200
+  dbIopsSleepMicros: 10000

@@ -1,0 +1,20 @@
+# Public Domain
+# SPDX-License-Identifier: Public-Domain
+
+# yaml-language-server: $schema=https://raw.githubusercontent.com/defenseunicorns/zarf/main/zarf.schema.json
+kind: ZarfPackageConfig
+metadata:
+  name: backup-io-simulator-test
+  description: Backup I/O simulator test package
+  version: "0.1.0"
+
+components:
+  - name: backup-io-simulator
+    required: true
+    charts:
+      - name: backup-io-simulator
+        namespace: backup-io-simulator
+        version: 0.1.0
+        localPath: chart/
+    images:
+      - alpine:latest
