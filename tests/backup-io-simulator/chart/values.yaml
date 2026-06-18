@@ -24,3 +24,19 @@ simulator:
   batchIntervalSeconds: 5
   dbCheckpointEvery: 200
   dbIopsSleepMicros: 10000
+
+# Velero BackupSchedule configuration
+veleroBackupSchedule:
+  name: backup-io-simulator-schedule
+  namespace: velero
+  schedule: "*/5 * * * *"
+  includedNamespaces:
+    - default
+  includedResources:
+    - persistentvolumeclaims
+    - persistentvolumes
+  snapshotVolumes: true
+  defaultVolumesToFsBackup: false
+  ttl: 0h10m
+  labels:
+    app: backup-io-simulator
