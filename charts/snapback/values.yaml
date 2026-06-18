@@ -21,8 +21,11 @@ manager:
   metricsPort: 8080
   probePort: 8081
   resources:
-    requests: { cpu: 50m, memory: 128Mi }
-    limits: { memory: 512Mi }
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
 
 # peat-node sidecar/receiver. This is DEPLOYMENT-time config for the peat process
 # itself. The replication TARGET (destination endpointID/addresses/relay, priority,
@@ -36,7 +39,7 @@ peat:
   appId: snapback
   # Iroh shared key, base64 (32 bytes). Either set sharedKey here (the chart creates
   # the Secret) OR point existingSharedKeySecret at a Secret with key "shared-key".
-  sharedKey: ""
+  sharedKey: "gNTCHl9knhEvrfmfiJAo0Te9kcbYnOzet44OpuZ+sko="
   existingSharedKeySecret: ""
   irohUdpPort: 51820
   grpcPort: 50051
@@ -45,8 +48,11 @@ peat:
   handleRetentionSecs: 604800
   logLevel: "peat_node=info,peat_node::attachments=debug"
   resources:
-    requests: { cpu: 100m, memory: 256Mi }
-    limits: { memory: 1Gi }
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
 
 # Persistent volumes. "" storageClassName uses the cluster default (local-path on k3d-uds).
 storageClassName: ""

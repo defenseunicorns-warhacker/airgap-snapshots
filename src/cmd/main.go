@@ -1,3 +1,6 @@
+// Copyright 2026 Defense Unicorns
+// SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
 // Command snapback runs the Snapback controller-manager: it watches Velero
 // Backups and replicates completed backups to a peer cluster over a co-located
 // peat-node sidecar. See docs/DESIGN.md.

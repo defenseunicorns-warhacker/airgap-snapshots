@@ -1,3 +1,6 @@
+// Copyright 2026 Defense Unicorns
+// SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
 // Package objstore is the client seam for reading a Velero Backup Storage
 // Location (BSL) bucket as object storage, and for persisting the per-BSL
 // replication ledger.

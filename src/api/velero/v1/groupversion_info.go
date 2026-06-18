@@ -1,3 +1,6 @@
+// Copyright 2026 Defense Unicorns
+// SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
 // Package v1 is a MINIMAL, hand-maintained subset of the Velero velero.io/v1
 // API — only the fields Snapback reads. It exists so the operator can watch and
 // resolve Velero resources without taking a dependency on the entire Velero

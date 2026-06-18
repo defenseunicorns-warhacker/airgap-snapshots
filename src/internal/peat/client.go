@@ -1,3 +1,6 @@
+// Copyright 2026 Defense Unicorns
+// SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
 // Package peat is the client seam between Snapback's controllers and the
 // co-located peat-node sidecar (peat.sidecar.v1.PeatSidecar gRPC API).
 //

@@ -1,3 +1,6 @@
+// Copyright 2026 Defense Unicorns
+// SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
 // Package staging streams BSL objects into the peat-node outbox volume and
 // produces the peat.FileSpec (with size + sha256 computed in a single pass)
 // that SendAttachments needs.

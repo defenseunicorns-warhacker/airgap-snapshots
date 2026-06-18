@@ -1,3 +1,6 @@
+// Copyright 2026 Defense Unicorns
+// SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
 // Package batching packs a backup's staged files into peat SendAttachments
 // bundles that respect peat's per-bundle caps: a file-count limit
 // (--attachment-max-files-per-bundle, default 64) AND a total-bytes limit

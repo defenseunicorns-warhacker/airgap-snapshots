@@ -1,3 +1,6 @@
+// Copyright 2026 Defense Unicorns
+// SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
 // Package v1alpha1 contains the snapback.uds.dev/v1alpha1 API types.
 //
 // +kubebuilder:object:generate=true
