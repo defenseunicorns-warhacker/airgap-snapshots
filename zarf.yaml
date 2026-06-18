@@ -5,7 +5,7 @@
 kind: ZarfPackageConfig
 metadata:
   name: snapback
-  description: "Kubernetes operator that replicates Velero backups between clusters using peat"
+  description: "Kubernetes operator that replicates Velero backups between clusters using Peat"
   version: "dev"
   annotations:
     dev.uds.title: Snapback
