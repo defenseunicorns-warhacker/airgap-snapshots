@@ -46,6 +46,17 @@ Name of the Secret holding the peat Iroh shared key.
 {{- end -}}
 
 {{/*
+Name of the Secret holding the destination object-store credentials.
+*/}}
+{{- define "snapback.destCredsSecretName" -}}
+{{- if .Values.destination.objectStore.credentials.existingSecret -}}
+{{ .Values.destination.objectStore.credentials.existingSecret }}
+{{- else -}}
+{{ include "snapback.name" . }}-dest-creds
+{{- end -}}
+{{- end -}}
+
+{{/*
 Validate role early with a clear message.
 */}}
 {{- define "snapback.validateRole" -}}

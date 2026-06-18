@@ -140,8 +140,42 @@ func (s *minioStore) Open(ctx context.Context, key string) (io.ReadCloser, error
 	return obj, nil
 }
 
+func (s *minioStore) Put(ctx context.Context, key string, r io.Reader, size int64, contentType string) error {
+	opts := minio.PutObjectOptions{}
+	if contentType != "" {
+		opts.ContentType = contentType
+	}
+	if _, err := s.client.PutObject(ctx, s.bucket, s.fullKey(key), r, size, opts); err != nil {
+		return fmt.Errorf("objstore: put %q: %w", key, err)
+	}
+	return nil
+}
+
+func (s *minioStore) Stat(ctx context.Context, key string) (ObjectInfo, bool, error) {
+	st, err := s.client.StatObject(ctx, s.bucket, s.fullKey(key), minio.StatObjectOptions{})
+	if err != nil {
+		if isNotFound(err) {
+			return ObjectInfo{}, false, nil
+		}
+		return ObjectInfo{}, false, fmt.Errorf("objstore: stat %q: %w", key, err)
+	}
+	// Echo the caller's relative key (Stat targets it directly; no listing to invert).
+	return ObjectInfo{
+		Key:          key,
+		Size:         st.Size,
+		ETag:         strings.Trim(st.ETag, `"`),
+		LastModified: st.LastModified,
+	}, true, nil
+}
+
+// Ledger keys are bucket-absolute (NOT under Config.Prefix). Velero validates a
+// BSL by listing the top-level directories under its prefix and rejects any it
+// doesn't recognize, so a ledger written under the prefix (e.g.
+// backups/snapback/...) makes Velero mark the BSL "Unavailable: invalid
+// top-level directories: [snapback]". Writing the ledger at the bucket root keeps
+// it co-located with the data while staying outside every prefixed BSL's view.
 func (s *minioStore) GetLedger(ctx context.Context, key string) ([]byte, string, error) {
-	obj, err := s.client.GetObject(ctx, s.bucket, s.fullKey(key), minio.GetObjectOptions{})
+	obj, err := s.client.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, "", fmt.Errorf("objstore: get ledger %q: %w", key, err)
 	}
@@ -172,7 +206,9 @@ func (s *minioStore) PutLedger(ctx context.Context, key string, body []byte, eta
 	} else {
 		opts.SetMatchETag(etag)
 	}
-	info, err := s.client.PutObject(ctx, s.bucket, s.fullKey(key), bytes.NewReader(body), int64(len(body)), opts)
+	// Bucket-absolute key (see GetLedger): keep the ledger out of the BSL prefix
+	// so Velero's top-level-directory validation doesn't reject the location.
+	info, err := s.client.PutObject(ctx, s.bucket, key, bytes.NewReader(body), int64(len(body)), opts)
 	if err != nil {
 		if isPreconditionFailed(err) {
 			return "", ErrLedgerConflict

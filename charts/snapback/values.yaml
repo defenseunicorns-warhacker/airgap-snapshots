@@ -66,6 +66,43 @@ peatData:
 inbox:
   size: 500Gi
 
+# destination role: how the co-located importer reconstructs replicated backups.
+# Ignored when role=source. The importer reads the inbox PVC (peat-written),
+# verifies each landed file against the CRDT manifest, and writes it to the
+# destination object store laid out as a Velero BSL (velero-backup.json last).
+destination:
+  # Inbox PVC mount path (where the peat receiver writes pulled attachments).
+  inboxPath: /var/lib/peat/inbox
+  # How often the importer polls the manifest collection for new backups.
+  manifestPollInterval: 30s
+  # Destination object store (a Velero BSL bucket). Point a destination Velero
+  # BSL at this same bucket+prefix and it auto-discovers the imported backups.
+  objectStore:
+    endpoint: "" # e.g. http://minio.uds-dev-stack.svc.cluster.local:9000
+    region: ""
+    bucket: "" # e.g. uds-dr
+    # prefix is where the importer writes (objects land at <prefix>/backups/<name>/...).
+    # The destination Velero BSL MUST be configured with this SAME prefix so its
+    # backup-sync controller auto-discovers the imported backups. It is independent
+    # of the source BSL prefix.
+    prefix: backups
+    s3ForcePathStyle: true
+    insecureSkipTLSVerify: false
+    # Credentials: an AWS shared-credentials Secret (Velero "cloud" format).
+    # Either point existingSecret at a Secret in this namespace, or set inline
+    # (dev) and the chart creates the Secret.
+    credentials:
+      existingSecret: "" # Secret name holding the creds (key below)
+      secretKey: cloud # key within the Secret holding the credentials file
+      profile: "" # profile within the credentials file ("" = default)
+      inline: "" # dev-only inline creds; chart creates the Secret when set
+  # Source peat peer for the reverse ConnectPeer (so the receiver can dial back
+  # and pull). Empty endpointID => peering is bootstrapped out-of-band.
+  sourcePeer:
+    endpointID: ""
+    addresses: []
+    relayURL: ""
+
 # Optionally have the chart create a ReplicationPolicy (source role only). Off by
 # default — usually authored after deploy once the destination's Iroh endpoint id
 # is known (see hack/m3/e2e.sh for how that id is discovered). Filling target.* and

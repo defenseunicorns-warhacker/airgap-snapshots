@@ -235,6 +235,46 @@ func (c *connectClient) WaitBundle(ctx context.Context, bundleID string) ([]Prog
 	}
 }
 
+// --- Document plane (CRDT) ---
+//
+// Documents are JSON blobs in named collections, synced via CRDT over the mesh.
+// json_data is itself a JSON-encoded string on the wire; we pass the manifest
+// bytes through verbatim.
+
+func (c *connectClient) PutDocument(ctx context.Context, collection, docID string, jsonData []byte) error {
+	req := map[string]any{
+		"collection": collection,
+		"docId":      docID,
+		"jsonData":   string(jsonData),
+	}
+	return c.call(ctx, "PutDocument", req, nil)
+}
+
+func (c *connectClient) GetDocument(ctx context.Context, collection, docID string) ([]byte, bool, error) {
+	// jsonData is `optional string`; proto3-JSON omits it entirely when the
+	// document is absent, so a nil pointer means not-found.
+	var r struct {
+		JSONData *string `json:"jsonData"`
+	}
+	if err := c.call(ctx, "GetDocument", map[string]any{"collection": collection, "docId": docID}, &r); err != nil {
+		return nil, false, err
+	}
+	if r.JSONData == nil {
+		return nil, false, nil
+	}
+	return []byte(*r.JSONData), true, nil
+}
+
+func (c *connectClient) ListDocuments(ctx context.Context, collection string) ([]string, error) {
+	var r struct {
+		DocIDs []string `json:"docIds"`
+	}
+	if err := c.call(ctx, "ListDocuments", map[string]any{"collection": collection}, &r); err != nil {
+		return nil, err
+	}
+	return r.DocIDs, nil
+}
+
 func (c *connectClient) Close() error { return nil }
 
 func protoPriority(p Priority) string {

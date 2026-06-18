@@ -8,14 +8,19 @@
 // Controllers depend only on the Store interface. The real S3/MinIO
 // implementation lives in minio.go (minio-go); New() returns it.
 //
-// Key contract: every key that crosses this interface — the List prefix, each
-// returned ObjectInfo.Key, the Open key, and the ledger keys — is **relative to
-// Config.Prefix**. The implementation prepends Config.Prefix for the wire call
-// and strips it from listed keys, so keys round-trip cleanly between List ->
-// Open and List -> ledger. This matters for Velero: a BSL with prefix
-// "backups" stores real objects at "backups/backups/<name>/..." and
+// Key contract: the data keys — the List prefix, each returned ObjectInfo.Key,
+// the Open/Put/Stat key — are **relative to Config.Prefix**. The implementation
+// prepends Config.Prefix for the wire call and strips it from listed keys, so
+// keys round-trip cleanly between List -> Open. This matters for Velero: a BSL
+// with prefix "backups" stores real objects at "backups/backups/<name>/..." and
 // "backups/kopia/<ns>/...", so callers pass the logical key ("backups/<name>/")
 // and the store handles the prefix nesting.
+//
+// The ledger keys (GetLedger/PutLedger) are the exception: they are
+// **bucket-absolute** (NOT under Config.Prefix). Velero validates a BSL by
+// listing the top-level directories under its prefix and rejects any it doesn't
+// recognize, so the ledger must live outside every prefixed BSL's view (at the
+// bucket root) to avoid marking the BSL "Unavailable".
 package objstore
 
 import (
@@ -55,12 +60,20 @@ type Store interface {
 	List(ctx context.Context, prefix string) ([]ObjectInfo, error)
 	// Open streams the object at key (relative to Config.Prefix).
 	Open(ctx context.Context, key string) (io.ReadCloser, error)
-	// GetLedger reads the ledger object, returning its body and ETag.
-	// A missing ledger returns (nil, "", nil).
+	// Put writes size bytes from r to key (relative to Config.Prefix). Used by
+	// the destination importer to reconstruct the BSL layout; the source path
+	// does not call it. contentType may be "".
+	Put(ctx context.Context, key string, r io.Reader, size int64, contentType string) error
+	// Stat returns the object's info and true if it exists at key (relative to
+	// Config.Prefix), or a zero ObjectInfo and false if absent.
+	Stat(ctx context.Context, key string) (ObjectInfo, bool, error)
+	// GetLedger reads the ledger object, returning its body and ETag. The key is
+	// bucket-absolute (NOT under Config.Prefix; see the package doc). A missing
+	// ledger returns (nil, "", nil).
 	GetLedger(ctx context.Context, key string) (body []byte, etag string, err error)
-	// PutLedger writes the ledger object with an optimistic If-Match on etag
-	// ("" means create-if-absent). Returns the new ETag. A precondition failure
-	// (concurrent writer) is reported as ErrLedgerConflict.
+	// PutLedger writes the ledger object (bucket-absolute key) with an optimistic
+	// If-Match on etag ("" means create-if-absent). Returns the new ETag. A
+	// precondition failure (concurrent writer) is reported as ErrLedgerConflict.
 	PutLedger(ctx context.Context, key string, body []byte, etag string) (newETag string, err error)
 	// Close releases resources.
 	Close() error

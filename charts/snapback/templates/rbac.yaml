@@ -32,6 +32,30 @@ rules:
 - apiGroups: [velero.io]
   resources: [backups, backupstoragelocations]
   verbs: [get, list, watch]
+{{- else if eq .Values.role "destination" }}
+# Least-privilege importer role: own the BackupImport work items and emit events.
+# No Velero or Backup access (it writes object storage) and no Secret access
+# (destination-store credentials are mounted as a file, not read via the API).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "snapback.fullname" . }}-manager
+  labels:
+    {{- include "snapback.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: [events]
+  verbs: [create, patch]
+- apiGroups: [snapback.uds.dev]
+  resources: [backupimports]
+  verbs: [create, delete, get, list, patch, update, watch]
+- apiGroups: [snapback.uds.dev]
+  resources: [backupimports/finalizers]
+  verbs: [update]
+- apiGroups: [snapback.uds.dev]
+  resources: [backupimports/status]
+  verbs: [get, patch, update]
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -47,4 +71,3 @@ subjects:
 - kind: ServiceAccount
   name: {{ include "snapback.serviceAccountName" . }}
   namespace: {{ .Release.Namespace }}
-{{- end }}

@@ -5,8 +5,10 @@ package controller
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"path"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -22,6 +24,7 @@ import (
 	snapbackv1alpha1 "github.com/defenseunicorns/snapback/api/v1alpha1"
 	velerov1 "github.com/defenseunicorns/snapback/api/velero/v1"
 	"github.com/defenseunicorns/snapback/internal/batching"
+	"github.com/defenseunicorns/snapback/internal/manifest"
 	"github.com/defenseunicorns/snapback/internal/objstore"
 	"github.com/defenseunicorns/snapback/internal/peat"
 	"github.com/defenseunicorns/snapback/internal/staging"
@@ -164,6 +167,10 @@ func (r *BackupReplicationReconciler) replicate(ctx context.Context, br *snapbac
 	prio := mapPriority(policy.Spec.Priority)
 
 	bundleStatuses := make([]snapbackv1alpha1.BundleStatus, 0, len(batches))
+	// entries accumulates the manifest plane (DESIGN §3.5): each shipped file's
+	// original BSL key + sha256/size + where its bytes land (distributionID +
+	// basename). Built from the SendAttachments handles correlated to FileSpecs.
+	entries := make([]manifest.FileEntry, 0, len(specs))
 	allDone := true
 	for i, b := range batches {
 		bundleID := fmt.Sprintf("%s-%04d", br.Name, i)
@@ -174,8 +181,26 @@ func (r *BackupReplicationReconciler) replicate(ctx context.Context, br *snapbac
 			Phase:     snapbackv1alpha1.BundlePending,
 		}
 
-		if _, err := pc.SendAttachments(ctx, bundleID, b.Files, scope, prio); err != nil {
+		res, err := pc.SendAttachments(ctx, bundleID, b.Files, scope, prio)
+		if err != nil {
 			return r.transientErr(ctx, br, "SendFailed", err)
+		}
+		// peat returns one handle per FileSpec in request order; FileIndex maps
+		// the handle back to the file. Re-sends are idempotent and return the
+		// same handles, so entries are stable across reconciles.
+		for _, h := range res.Handles {
+			if int(h.FileIndex) >= len(b.Files) {
+				continue // defensive against a malformed handle index
+			}
+			f := b.Files[h.FileIndex]
+			entries = append(entries, manifest.FileEntry{
+				Key:            f.RelativePath,
+				Basename:       path.Base(f.RelativePath),
+				SHA256:         hex.EncodeToString(f.SHA256[:]),
+				Size:           int64(f.Size),
+				DistributionID: h.DistributionID,
+				BlobToken:      h.BlobToken,
+			})
 		}
 		// WaitBundle blocks until terminal. TODO(M3): make this incremental and
 		// time-boxed (RequeueAfter) so reconciles don't block on long DDIL waits,
@@ -196,12 +221,18 @@ func (r *BackupReplicationReconciler) replicate(ctx context.Context, br *snapbac
 		return ctrl.Result{RequeueAfter: requeueAfterTransient}, r.Status().Update(ctx, br)
 	}
 
-	// 6. All bundles COMPLETED (sender-side). Commit the ledger and finish.
+	// 6. All bundles COMPLETED (sender-side, "transmitted"). Publish the manifest
+	// (metadata plane, DESIGN §3.5) so the destination importer can reconstruct
+	// the BSL layout, then commit the ledger. Manifest first: never mark a backup
+	// Replicated without a manifest the destination can act on.
+	now := metav1.Now()
+	br.Status.CompletedAt = &now
+	if err := r.emitManifest(ctx, pc, br, cfg.Prefix, entries, int64(total), now); err != nil {
+		return r.transientErr(ctx, br, "ManifestEmitFailed", err)
+	}
 	if err := r.commitLedger(ctx, store, br, keys); err != nil {
 		return r.transientErr(ctx, br, "LedgerCommitFailed", err)
 	}
-	now := metav1.Now()
-	br.Status.CompletedAt = &now
 	r.setPhase(br, snapbackv1alpha1.PhaseReplicated)
 	apimeta.SetStatusCondition(&br.Status.Conditions, metav1.Condition{
 		Type: "Ready", Status: metav1.ConditionTrue, Reason: "Replicated",
@@ -295,6 +326,10 @@ type ledgerEntry struct {
 	Size int64  `json:"size"`
 }
 
+// ledgerKey is bucket-absolute (resolves to the bucket root, NOT under the BSL
+// prefix) so Velero's BSL validation — which rejects unrecognized top-level
+// directories under the prefix — doesn't mark the BSL Unavailable. See
+// objstore.Store.GetLedger/PutLedger.
 func ledgerKey(bsl string) string { return fmt.Sprintf("snapback/ledger/%s.json", bsl) }
 
 // enumerateDelta lists the backup's metadata objects plus the Kopia/Restic
@@ -359,6 +394,37 @@ func (r *BackupReplicationReconciler) commitLedger(ctx context.Context, store ob
 	}
 	_, err = store.PutLedger(ctx, key, out, etag)
 	return err
+}
+
+// emitManifest publishes the per-backup replication manifest into the peat
+// snapback_replications collection. The destination importer reads it to map
+// peat's flattened inbox files (inbox/<distributionID>/<basename>) back to
+// their original BSL keys. complete=true marks the manifest committed; the
+// importer ignores a manifest until then. PutDocument is idempotent, so a
+// retried reconcile converges on the same document.
+func (r *BackupReplicationReconciler) emitManifest(ctx context.Context, pc peat.Client, br *snapbackv1alpha1.BackupReplication, bslPrefix string, entries []manifest.FileEntry, total int64, completedAt metav1.Time) error {
+	m := &manifest.Manifest{
+		SchemaVersion:   manifest.SchemaVersion,
+		BackupName:      br.Spec.BackupName,
+		StorageLocation: br.Spec.StorageLocation,
+		BSLPrefix:       bslPrefix,
+		ObjectCount:     len(entries),
+		TotalBytes:      total,
+		CompletedAt:     completedAt.UTC().Format(time.RFC3339),
+		Complete:        true,
+		Files:           entries,
+	}
+	data, err := m.Marshal()
+	if err != nil {
+		return fmt.Errorf("marshal manifest: %w", err)
+	}
+	docID := manifest.DocID(br.Spec.StorageLocation, br.Spec.BackupName)
+	if err := pc.PutDocument(ctx, manifest.Collection, docID, data); err != nil {
+		return fmt.Errorf("put manifest %q: %w", docID, err)
+	}
+	log.FromContext(ctx).Info("emitted replication manifest",
+		"doc", docID, "collection", manifest.Collection, "files", len(entries), "bytes", total)
+	return nil
 }
 
 func (r *BackupReplicationReconciler) setPhase(br *snapbackv1alpha1.BackupReplication, p snapbackv1alpha1.ReplicationPhase) {
