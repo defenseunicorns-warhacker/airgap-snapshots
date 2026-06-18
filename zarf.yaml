@@ -21,6 +21,16 @@ variables:
   # (network policy) and the app chart (workloads). source | destination.
   - name: ROLE
     default: "source"
+  # Static cross-host peer for attachment delivery between clusters. Derive the
+  # OTHER side's peat endpoint id offline before deploy (it's deterministic from
+  # the shared key + that node's id, which the chart sets to "snapback-<role>"):
+  #   peat-node derive-id --shared-key <key> --node-id snapback-destination
+  - name: PEER_ID
+    default: ""
+  # The peer reachable as host:udp-port, exposing its iroh UDP endpoint
+  # cross-host (node IP / NodePort / LoadBalancer). e.g. 10.0.0.20:51820
+  - name: PEER_ADDR
+    default: ""
 
 components:
   - name: snapback

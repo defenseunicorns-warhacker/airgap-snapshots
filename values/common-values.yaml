@@ -9,3 +9,12 @@ role: "###ZARF_VAR_ROLE###"
 # NOTE: peat.sharedKey is intentionally NOT set here — production deployments must
 # supply it (and a matching one on the destination) via a bundle override or
 # peat.existingSharedKeySecret. The dev test bundle sets a throwaway key.
+
+# Static cross-host peer (derived offline; see the PEER_ID/PEER_ADDR Zarf
+# variables). Empty by default — Zarf substitutes them at deploy time. When both
+# are set the chart wires PEAT_NODE_PEERS and disables mDNS for cross-host
+# attachment delivery.
+peat:
+  peer:
+    id: "###ZARF_VAR_PEER_ID###"
+    addr: "###ZARF_VAR_PEER_ADDR###"

@@ -43,6 +43,18 @@ peat:
   existingSharedKeySecret: ""
   irohUdpPort: 51820
   grpcPort: 50051
+  # Static cross-host peer for attachment delivery between clusters. peat endpoint
+  # identity is deterministic — endpoint_id = HKDF(sharedKey, "iroh:" + nodeID) —
+  # so the OTHER side's id can be derived offline before deploy. This chart sets
+  # PEAT_NODE_NODE_ID to "snapback-<role>", so derive against that:
+  #   peat-node derive-id --shared-key <key> --node-id snapback-destination
+  # addr is the peer reachable as host:udp-port (a node IP / NodePort / LB that
+  # exposes the peer's irohUdpPort over UDP — clusterIP alone is not reachable
+  # cross-host). Setting BOTH enables static peering (PEAT_NODE_PEERS) and disables
+  # mDNS; leave empty for in-cluster discovery via the ReplicationPolicy CR.
+  peer:
+    id: ""
+    addr: ""
   # Retain terminal-bundle handles long enough to outlast the worst-case DDIL
   # outage (7d). Sized against the outbox PVC.
   handleRetentionSecs: 604800

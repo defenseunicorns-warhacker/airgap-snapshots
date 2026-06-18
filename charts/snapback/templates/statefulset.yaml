@@ -94,6 +94,13 @@ spec:
               name: {{ include "snapback.sharedKeySecretName" . }}
               key: shared-key
         - { name: PEAT_NODE_IROH_UDP_PORT, value: {{ .Values.peat.irohUdpPort | quote }} }
+        {{- if and .Values.peat.peer.id .Values.peat.peer.addr }}
+        # Static cross-host peer (<derived endpoint_id>@<host:udp-port>) for
+        # attachment delivery between clusters. mDNS can't cross subnets, so a
+        # static peer is the no-discovery case — disable it.
+        - { name: PEAT_NODE_PEERS, value: "{{ .Values.peat.peer.id }}@{{ .Values.peat.peer.addr }}" }
+        - { name: PEAT_NODE_DISABLE_MDNS, value: "true" }
+        {{- end }}
         {{- if $isSource }}
         - { name: PEAT_NODE_ATTACHMENT_ROOT, value: "outbox=/var/lib/peat/outbox" }
         - { name: PEAT_NODE_ATTACHMENT_DEFAULT_PRIORITY, value: "bulk" }
