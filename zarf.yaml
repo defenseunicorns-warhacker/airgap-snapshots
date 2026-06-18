@@ -59,7 +59,7 @@ components:
                 --output=type=oci,dest=images.tar
     # peat-node is pulled from upstream and baked into the package (airgap).
     images:
-      - ghcr.io/defenseunicorns/peat-node:v0.3.1
+      - ghcr.io/defenseunicorns/peat-node:v0.4.3
     # The locally-built controller-manager image (OCI archive from buildx above).
     imageArchives:
       - path: images.tar

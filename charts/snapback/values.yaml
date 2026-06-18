@@ -33,7 +33,7 @@ manager:
 peat:
   image:
     repository: ghcr.io/defenseunicorns/peat-node
-    tag: v0.3.1
+    tag: v0.4.3
     pullPolicy: IfNotPresent
   # appId + sharedKey authenticate peers; they MUST match across source/destination.
   appId: snapback
