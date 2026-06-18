@@ -15,6 +15,6 @@ components:
       - name: backup-io-simulator
         namespace: backup-io-simulator
         version: 0.1.0
-        localPath: .
+        localPath: chart/
     images:
       - alpine:latest
