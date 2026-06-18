@@ -1,0 +1,42 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
+kind: UDSBundle
+metadata:
+  name: snapback-test
+  description: A UDS bundle for deploying Snapback and its dependencies on a development cluster
+  version: dev
+
+packages:
+  - name: core-backup-restore
+    repository: ghcr.io/defenseunicorns/packages/uds/core-backup-restore
+    ref: 1.6.0-registry1
+    overrides:
+      velero:
+        velero:
+          values:
+            - path: "configuration.backupStorageLocation"
+              value:
+                - name: default
+                  provider: aws
+                  bucket: "uds"
+                  prefix: "backups"
+                  config:
+                    region: "uds-dev-stack"
+                    s3ForcePathStyle: true
+                    s3Url: "http://minio.uds-dev-stack.svc.cluster.local:9000"
+                  credential:
+                    name: "velero-bucket-credentials"
+                    key: "cloud"
+
+  - name: snapback
+    path: ../
+    ref: dev
+    overrides:
+      snapback:
+        snapback:
+          values:
+            # We always want to pull the latest image when deploying
+            # the dev bundle since it is built and tagged "just in time"
+            - path: image.pullPolicy
+              value: Always

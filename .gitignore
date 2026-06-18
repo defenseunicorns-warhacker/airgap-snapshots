@@ -1,0 +1,39 @@
+**/*.tfstate
+**/*.tfstate.backup
+*.tar
+*.tar.gz
+*.tar.zst
+~/
+.DS_Store
+defense-unicorns-distro/preflight.sh
+.terraform
+tmp
+zarf-sbom
+
+.cache/
+.idea/
+build/
+test/tf/public-ec2-instance/.tool-versions
+tmp/
+values-*.yaml
+overlay-values-*
+.tool-versions
+
+# Terraform
+test/tf/public-ec2-instance/.test-data
+test/tf/public-ec2-instance/.terraform
+terraform.tfstate
+terraform.tfstate.backup
+.terraform.lock.hcl
+
+# Tests
+node_modules/
+.playwright/
+
+# VSCode
+.vscode/
+
+# MCP server configs
+.mcp.json
+.cursor/mcp.json
+mcp_config.json

@@ -1,0 +1,57 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
+# yaml-language-server: $schema=https://raw.githubusercontent.com/defenseunicorns/zarf/main/zarf.schema.json
+kind: ZarfPackageConfig
+metadata:
+  name: snapback
+  description: "UDS Snapback package"
+  version: "dev"
+  annotations:
+    dev.uds.title: Snapback
+    dev.uds.tagline: ""
+    dev.uds.categories: ""
+    dev.uds.keywords: ""
+    dev.uds.icon: ""
+
+variables:
+  - name: DOMAIN
+    default: "uds.dev"
+
+components:
+  - name: snapback
+    required: true
+    only:
+      flavor: upstream
+    charts:
+      - name: uds-snapback-config
+        namespace: snapback
+        version: 0.1.0
+        localPath: charts/uds-snapback-config/
+        valuesFiles:
+          - values/common-values.yaml
+      - name: snapback
+        namespace: snapback
+        version: 0.1.0
+        localPath: charts/snapback/
+        valuesFiles:
+          - values/common-values.yaml
+    actions:
+      onCreate:
+        before:
+          - description: Ensure buildx builder exists
+            cmd: |
+              docker buildx create --use \
+                --name uds-builder \
+                --driver docker-container || true
+          - description: Build container images for package
+            cmd: |
+              docker buildx build src/ \
+                --builder=uds-builder \
+                --platform=linux/amd64,linux/arm64 \
+                --tag=zarf.internal/snapback-operator:latest \
+                --output=type=oci,dest=images.tar
+    imageArchives:
+      - path: images.tar
+        images:
+          - zarf.internal/snapback-operator:latest
