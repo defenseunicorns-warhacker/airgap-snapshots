@@ -6,8 +6,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{.Values.pvc.name}}
 spec:
-  accessModes:
-    {{- toYaml .Values.pvc.accessModes | nindent 4 }}
+  accessModes: {{toYaml .Values.pvc.accessModes | nindent 4}}
   resources:
     requests:
       storage: {{.Values.pvc.storage}}
@@ -18,154 +17,154 @@ metadata:
   name: {{.Values.pod.name}}
 spec:
   containers:
-  - name: log-append-simulator
-    image: "{{.Values.image.repository}}:{{.Values.image.tag}}"
-    imagePullPolicy: {{.Values.image.pullPolicy}}
-    command: ["/bin/sh", "-c"]
-    args:
-      - |
-        echo "Starting log simulation..."
-        mkdir -p /data/logs
-        BASE_TS=1718400000
-        LINE_COUNT=0
-        ROTATE_AFTER={{.Values.simulator.logRotateAfter}}
-        LOG=/data/logs/app.log
-        while true; do
-          BURST=$((50 + (LINE_COUNT % 150)))
-          i=0
-          while [ $i -lt $BURST ]; do
-            EVENT_INDEX=$((LINE_COUNT + i))
-            case $((EVENT_INDEX % 5)) in
-              0) HOST=webserver01 ;;
-              1) HOST=dbhost02 ;;
-              2) HOST=appnode03 ;;
-              3) HOST=loadbalancer04 ;;
-              *) HOST=worker05 ;;
-            esac
-            case $((EVENT_INDEX % 7)) in
-              0) PROC=kernel ;;
-              1) PROC=nginx ;;
-              2) PROC=postgres ;;
-              3) PROC=sshd ;;
-              4) PROC=cron ;;
-              5) PROC=systemd ;;
-              *) PROC=auditd ;;
-            esac
-            case $((EVENT_INDEX % 6)) in
-              0|1|2|3) LEVEL=INFO ;;
-              4) LEVEL=WARNING ;;
-              *) LEVEL=ERROR ;;
-            esac
-            PID=$((1000 + (EVENT_INDEX % 60000)))
-            OFFSET=$((BASE_TS + EVENT_INDEX))
-            TIMESTAMP=$(printf 'Jun 14 12:%02d:%02d' $(((EVENT_INDEX / 60) % 60)) $((EVENT_INDEX % 60)))
-            echo "$TIMESTAMP $HOST [$LEVEL] $PROC[$PID]: request processed - elapsed $((EVENT_INDEX % 500))ms at $OFFSET" >> $LOG
-            i=$((i + 1))
+    - name: log-append-simulator
+      image: "{{.Values.image.repository}}:{{.Values.image.tag}}"
+      imagePullPolicy: {{.Values.image.pullPolicy}}
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          echo "Starting log simulation..."
+          mkdir -p /data/logs
+          BASE_TS=1718400000
+          LINE_COUNT=0
+          ROTATE_AFTER={{.Values.simulator.logRotateAfter}}
+          LOG=/data/logs/app.log
+          while true; do
+            BURST=$((50 + (LINE_COUNT % 150)))
+            i=0
+            while [ $i -lt $BURST ]; do
+              EVENT_INDEX=$((LINE_COUNT + i))
+              case $((EVENT_INDEX % 5)) in
+                0) HOST=webserver01 ;;
+                1) HOST=dbhost02 ;;
+                2) HOST=appnode03 ;;
+                3) HOST=loadbalancer04 ;;
+                *) HOST=worker05 ;;
+              esac
+              case $((EVENT_INDEX % 7)) in
+                0) PROC=kernel ;;
+                1) PROC=nginx ;;
+                2) PROC=postgres ;;
+                3) PROC=sshd ;;
+                4) PROC=cron ;;
+                5) PROC=systemd ;;
+                *) PROC=auditd ;;
+              esac
+              case $((EVENT_INDEX % 6)) in
+                0|1|2|3) LEVEL=INFO ;;
+                4) LEVEL=WARNING ;;
+                *) LEVEL=ERROR ;;
+              esac
+              PID=$((1000 + (EVENT_INDEX % 60000)))
+              OFFSET=$((BASE_TS + EVENT_INDEX))
+              TIMESTAMP=$(printf 'Jun 14 12:%02d:%02d' $(((EVENT_INDEX / 60) % 60)) $((EVENT_INDEX % 60)))
+              echo "$TIMESTAMP $HOST [$LEVEL] $PROC[$PID]: request processed - elapsed $((EVENT_INDEX % 500))ms at $OFFSET" >> $LOG
+              i=$((i + 1))
+            done
+            LINE_COUNT=$((LINE_COUNT + BURST))
+            sync $LOG 2>/dev/null || true
+            if [ $LINE_COUNT -ge $ROTATE_AFTER ]; then
+              mv $LOG /data/logs/app.log.1
+              LINE_COUNT=0
+              echo "Jun 14 12:00:00 localhost [INFO] logrotate[1]: rotated app.log" >> $LOG
+            fi
+            usleep 150000 2>/dev/null || sleep 0.15
           done
-          LINE_COUNT=$((LINE_COUNT + BURST))
-          sync $LOG 2>/dev/null || true
-          if [ $LINE_COUNT -ge $ROTATE_AFTER ]; then
-            mv $LOG /data/logs/app.log.1
-            LINE_COUNT=0
-            echo "Jun 14 12:00:00 localhost [INFO] logrotate[1]: rotated app.log" >> $LOG
-          fi
-          usleep 150000 2>/dev/null || sleep 0.15
-        done
-    volumeMounts:
-    - name: data-volume
-      mountPath: /data
+      volumeMounts:
+        - name: data-volume
+          mountPath: /data
 
-  - name: folder-fill-simulator
-    image: "{{.Values.image.repository}}:{{.Values.image.tag}}"
-    imagePullPolicy: {{.Values.image.pullPolicy}}
-    command: ["/bin/sh", "-c"]
-    args:
-      - |
-        echo "Starting data capture simulation..."
-        mkdir -p /data/uploads/batch /data/uploads/events
-        BATCH_COUNT=0
-        while true; do
-          TIMESTAMP=$((1718400000 + BATCH_COUNT))
-          BATCH_SIZE=$(((BATCH_COUNT % 5) + 1))
-          i=0
-          while [ $i -lt $BATCH_SIZE ]; do
-            SIZE_MB=$((((BATCH_COUNT + i) % 4) + 1))
-            LINES=$((SIZE_MB * 5000))
-            seq 1 $LINES | awk -v ts="$TIMESTAMP" -v batch="$BATCH_COUNT" -v part="$i" \
-              '{printf "Jun 14 12:00:%02d capture[1234]: record %d seq=%d payload=abcdef1234567890abcdef1234567890\n", (ts + NR) % 60, batch * 100000 + part * 10000 + NR, NR}' \
-              >> /data/uploads/batch/capture_${TIMESTAMP}_${i}.dat
-            i=$((i + 1))
+    - name: folder-fill-simulator
+      image: "{{.Values.image.repository}}:{{.Values.image.tag}}"
+      imagePullPolicy: {{.Values.image.pullPolicy}}
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          echo "Starting data capture simulation..."
+          mkdir -p /data/uploads/batch /data/uploads/events
+          BATCH_COUNT=0
+          while true; do
+            TIMESTAMP=$((1718400000 + BATCH_COUNT))
+            BATCH_SIZE=$(((BATCH_COUNT % 5) + 1))
+            i=0
+            while [ $i -lt $BATCH_SIZE ]; do
+              SIZE_MB=$((((BATCH_COUNT + i) % 4) + 1))
+              LINES=$((SIZE_MB * 5000))
+              seq 1 $LINES | awk -v ts="$TIMESTAMP" -v batch="$BATCH_COUNT" -v part="$i" \
+                '{printf "Jun 14 12:00:%02d capture[1234]: record %d seq=%d payload=abcdef1234567890abcdef1234567890\n", (ts + NR) % 60, batch * 100000 + part * 10000 + NR, NR}' \
+                >> /data/uploads/batch/capture_${TIMESTAMP}_${i}.dat
+              i=$((i + 1))
+            done
+            for j in $(seq 1 $(((BATCH_COUNT % 20) + 10))); do
+              echo "2026-06-14T12:00:00Z event_${j} sensor=node_${j} value=$(((BATCH_COUNT + j) % 1000))" \
+                > /data/uploads/events/evt_${TIMESTAMP}_${j}.json
+            done
+            BATCH_COUNT=$((BATCH_COUNT + 1))
+            sleep {{.Values.simulator.batchIntervalSeconds}}
           done
-          for j in $(seq 1 $(((BATCH_COUNT % 20) + 10))); do
-            echo "2026-06-14T12:00:00Z event_${j} sensor=node_${j} value=$(((BATCH_COUNT + j) % 1000))" \
-              > /data/uploads/events/evt_${TIMESTAMP}_${j}.json
-          done
-          BATCH_COUNT=$((BATCH_COUNT + 1))
-          sleep {{.Values.simulator.batchIntervalSeconds}}
-        done
-    volumeMounts:
-    - name: data-volume
-      mountPath: /data
+      volumeMounts:
+        - name: data-volume
+          mountPath: /data
 
-  - name: db-iops-simulator
-    image: "{{.Values.image.repository}}:{{.Values.image.tag}}"
-    imagePullPolicy: {{.Values.image.pullPolicy}}
-    command: ["/bin/sh", "-c"]
-    args:
-      - |
-        echo "Initializing database IOPS simulation..."
-        mkdir -p /data/db
-        for i in 1 2 3; do
-          FILE=/data/db/datafile_$i.db
-          if [ ! -f "$FILE" ]; then
-            echo "Allocating $FILE (256MB)..."
-            dd if=/dev/zero of="$FILE" bs=1M count=256 2>/dev/null
-          fi
-        done
-        WAL=/data/db/wal.log
-        touch $WAL
-        echo "Datafiles ready. Starting random I/O + WAL loop..."
-        FILES="/data/db/datafile_1.db /data/db/datafile_2.db /data/db/datafile_3.db"
-        MAX_PAGES=32767
-        OP_COUNT=0
-        CHECKPOINT_EVERY={{ .Values.simulator.dbCheckpointEvery }}
-        WAL_SEQ=0
-        while true; do
-          WAL_SEQ=$((WAL_SEQ + 1))
-          TXID=$((1000 + (WAL_SEQ % 9000)))
-          TABLE=$((WAL_SEQ % 10))
-          PAGE=$((WAL_SEQ % MAX_PAGES))
-          echo "LSN=$WAL_SEQ txid=$TXID op=UPDATE tbl=tbl_$TABLE page=$PAGE" >> $WAL
-          case $((WAL_SEQ % 3)) in
-            0) FILE=/data/db/datafile_1.db ;;
-            1) FILE=/data/db/datafile_2.db ;;
-            *) FILE=/data/db/datafile_3.db ;;
-          esac
-          OFFSET=$(((WAL_SEQ * 97 + OP_COUNT * 13) % MAX_PAGES))
-          OP=$((WAL_SEQ % 10))
-          if [ $OP -lt 8 ]; then
-            PAGE_PAYLOAD=$(printf 'page=%s lsn=%s txid=%s op=WRITE' "$OFFSET" "$WAL_SEQ" "$TXID")
-            printf '%-8192s' "$PAGE_PAYLOAD" | dd of="$FILE" bs=8k count=1 seek=$OFFSET conv=notrunc 2>/dev/null
-          else
-            dd if="$FILE" of=/dev/null bs=8k count=1 skip=$OFFSET 2>/dev/null
-          fi
-          OP_COUNT=$((OP_COUNT + 1))
-          if [ $OP_COUNT -ge $CHECKPOINT_EVERY ]; then
-            sync $WAL 2>/dev/null || true
-            for F in $FILES; do sync $F 2>/dev/null || true; done
-            mv $WAL /data/db/wal.log.prev
-            touch $WAL
-            OP_COUNT=0
-            WAL_SEQ=0
-            echo "2026-06-14T12:00:00Z checkpoint complete, WAL rotated" >> /data/db/pg.log
-          fi
-          usleep {{ .Values.simulator.dbIopsSleepMicros }} 2>/dev/null || sleep 0
-        done
-    volumeMounts:
-    - name: data-volume
-      mountPath: /data
+    - name: db-iops-simulator
+      image: "{{.Values.image.repository}}:{{.Values.image.tag}}"
+      imagePullPolicy: {{.Values.image.pullPolicy}}
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          echo "Initializing database IOPS simulation..."
+          mkdir -p /data/db
+          for i in 1 2 3; do
+            FILE=/data/db/datafile_$i.db
+            if [ ! -f "$FILE" ]; then
+              echo "Allocating $FILE (256MB)..."
+              dd if=/dev/zero of="$FILE" bs=1M count=256 2>/dev/null
+            fi
+          done
+          WAL=/data/db/wal.log
+          touch $WAL
+          echo "Datafiles ready. Starting random I/O + WAL loop..."
+          FILES="/data/db/datafile_1.db /data/db/datafile_2.db /data/db/datafile_3.db"
+          MAX_PAGES=32767
+          OP_COUNT=0
+          CHECKPOINT_EVERY={{ .Values.simulator.dbCheckpointEvery }}
+          WAL_SEQ=0
+          while true; do
+            WAL_SEQ=$((WAL_SEQ + 1))
+            TXID=$((1000 + (WAL_SEQ % 9000)))
+            TABLE=$((WAL_SEQ % 10))
+            PAGE=$((WAL_SEQ % MAX_PAGES))
+            echo "LSN=$WAL_SEQ txid=$TXID op=UPDATE tbl=tbl_$TABLE page=$PAGE" >> $WAL
+            case $((WAL_SEQ % 3)) in
+              0) FILE=/data/db/datafile_1.db ;;
+              1) FILE=/data/db/datafile_2.db ;;
+              *) FILE=/data/db/datafile_3.db ;;
+            esac
+            OFFSET=$(((WAL_SEQ * 97 + OP_COUNT * 13) % MAX_PAGES))
+            OP=$((WAL_SEQ % 10))
+            if [ $OP -lt 8 ]; then
+              PAGE_PAYLOAD=$(printf 'page=%s lsn=%s txid=%s op=WRITE' "$OFFSET" "$WAL_SEQ" "$TXID")
+              printf '%-8192s' "$PAGE_PAYLOAD" | dd of="$FILE" bs=8k count=1 seek=$OFFSET conv=notrunc 2>/dev/null
+            else
+              dd if="$FILE" of=/dev/null bs=8k count=1 skip=$OFFSET 2>/dev/null
+            fi
+            OP_COUNT=$((OP_COUNT + 1))
+            if [ $OP_COUNT -ge $CHECKPOINT_EVERY ]; then
+              sync $WAL 2>/dev/null || true
+              for F in $FILES; do sync $F 2>/dev/null || true; done
+              mv $WAL /data/db/wal.log.prev
+              touch $WAL
+              OP_COUNT=0
+              WAL_SEQ=0
+              echo "2026-06-14T12:00:00Z checkpoint complete, WAL rotated" >> /data/db/pg.log
+            fi
+            usleep {{ .Values.simulator.dbIopsSleepMicros }} 2>/dev/null || sleep 0
+          done
+      volumeMounts:
+        - name: data-volume
+          mountPath: /data
 
   volumes:
-  - name: data-volume
-    persistentVolumeClaim:
-      claimName: {{.Values.pvc.name}}
+    - name: data-volume
+      persistentVolumeClaim:
+        claimName: {{.Values.pvc.name}}
