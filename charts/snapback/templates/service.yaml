@@ -18,12 +18,14 @@ spec:
     port: {{ .Values.peat.irohUdpPort }}
     targetPort: iroh-quic
     protocol: UDP
-  {{- if eq .Values.role "source" }}
+  # Both roles run a manager that exposes metrics for the UDS monitor.
   - name: metrics
     port: {{ .Values.manager.metricsPort }}
     targetPort: metrics
     protocol: TCP
-  {{- else }}
+  {{- if eq .Values.role "destination" }}
+  # gRPC is exposed on the destination so the source can be peered in (ConnectPeer)
+  # during bring-up; the source peat listens on localhost only.
   - name: grpc
     port: {{ .Values.peat.grpcPort }}
     targetPort: grpc

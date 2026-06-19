@@ -53,6 +53,25 @@ spec:
         remoteProtocol: UDP
         description: "peat QUIC ingress from destination peer (pull)"
     {{- else }}
+      # Importer manager -> kube-apiserver (own BackupImport work items).
+      - direction: Egress
+        remoteGenerated: KubeAPI
+        description: "importer manager to kube-apiserver"
+
+      # Importer manager -> destination object store (MinIO/S3) to reconstruct
+      # the BSL layout.
+      - direction: Egress
+        {{- if .Values.objectStore.remoteCidr }}
+        remoteCidr: {{ .Values.objectStore.remoteCidr | quote }}
+        {{- else if .Values.objectStore.remoteNamespace }}
+        remoteNamespace: {{ .Values.objectStore.remoteNamespace | quote }}
+        {{- else }}
+        remoteGenerated: Anywhere
+        {{- end }}
+        port: {{ .Values.objectStore.port }}
+        remoteProtocol: TCP
+        description: "importer to destination object store"
+
       # Destination receiver <-> source over Iroh QUIC (UDP). Ingress to receive
       # the source's dial; Egress because the receiver dials back to pull blobs.
       - direction: Ingress
@@ -77,12 +96,13 @@ spec:
     {{- with .Values.additionalNetworkAllow }}
       {{- toYaml . | nindent 6 }}
     {{- end }}
-  {{- if and (eq .Values.role "source") .Values.monitor.enabled }}
+  {{- if .Values.monitor.enabled }}
+  # Both roles run a controller-manager exposing metrics; scrape by role component.
   monitor:
     - selector:
         app.kubernetes.io/name: snapback
-        app.kubernetes.io/component: source
+        app.kubernetes.io/component: {{ .Values.role }}
       portName: metrics
       targetPort: {{ .Values.manager.metricsPort }}
-      description: "Snapback controller-manager metrics"
+      description: "Snapback {{ .Values.role }} controller-manager metrics"
   {{- end }}

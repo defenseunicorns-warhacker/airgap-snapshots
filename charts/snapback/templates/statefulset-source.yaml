@@ -36,6 +36,7 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args:
+        - --role=source
         - --health-probe-bind-address=:{{ .Values.manager.probePort }}
         - --metrics-bind-address=:{{ .Values.manager.metricsPort }}
         {{- with .Values.manager.extraArgs }}

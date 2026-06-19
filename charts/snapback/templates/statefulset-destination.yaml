@@ -1,10 +1,14 @@
 # Copyright 2024 Defense Unicorns
 # SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
 {{- if eq .Values.role "destination" }}
-# Destination (v1 cold landing zone): peat-node receiver only. The attachment
-# inbox watcher pulls distributions and writes files to the inbox PVC. No Snapback
-# component runs here in v1 (no BSL reconstruction, no restore). gRPC listens on
-# 0.0.0.0 so the source can be peered in (ConnectPeer) during bring-up.
+{{- $creds := .Values.destination.objectStore.credentials }}
+{{- $hasCreds := or $creds.inline $creds.existingSecret }}
+# Destination: peat-node receiver + Snapback importer (manager) sharing the inbox
+# PVC. The receiver pulls distributions and writes files to the inbox; the manager
+# polls the CRDT manifest collection (localhost gRPC), verifies each landed file,
+# and reconstructs the original BSL layout into the destination object store so
+# destination Velero can auto-discover the backups. gRPC listens on 0.0.0.0 so the
+# source can be peered in (ConnectPeer) during bring-up.
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -23,14 +27,71 @@ spec:
       labels:
         {{- include "snapback.selectorLabels" . | nindent 8 }}
     spec:
+      serviceAccountName: {{ include "snapback.serviceAccountName" . }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
         runAsGroup: 65532
-        fsGroup: 65532
+        fsGroup: 65532 # shared inbox PVC readable by both containers
         seccompProfile:
           type: RuntimeDefault
       containers:
+      # --- Snapback importer (controller-manager, role=destination) ---
+      - name: manager
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args:
+        - --role=destination
+        - --health-probe-bind-address=:{{ .Values.manager.probePort }}
+        - --metrics-bind-address=:{{ .Values.manager.metricsPort }}
+        - --peat-address=localhost:{{ .Values.peat.grpcPort }}
+        - --inbox-path={{ .Values.destination.inboxPath }}
+        - --manifest-poll-interval={{ .Values.destination.manifestPollInterval }}
+        - --dest-endpoint={{ .Values.destination.objectStore.endpoint }}
+        - --dest-region={{ .Values.destination.objectStore.region }}
+        - --dest-bucket={{ .Values.destination.objectStore.bucket }}
+        - --dest-prefix={{ .Values.destination.objectStore.prefix }}
+        - --dest-s3-force-path-style={{ .Values.destination.objectStore.s3ForcePathStyle }}
+        - --dest-insecure-tls={{ .Values.destination.objectStore.insecureSkipTLSVerify }}
+        {{- if $hasCreds }}
+        - --dest-credentials-file=/etc/snapback/dest-creds/{{ $creds.secretKey }}
+        - --dest-credentials-profile={{ $creds.profile }}
+        {{- end }}
+        - --source-endpoint-id={{ .Values.destination.sourcePeer.endpointID }}
+        - --source-addresses={{ join "," .Values.destination.sourcePeer.addresses }}
+        - --source-relay-url={{ .Values.destination.sourcePeer.relayURL }}
+        {{- with .Values.manager.extraArgs }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        ports:
+        - { name: metrics, containerPort: {{ .Values.manager.metricsPort }} }
+        - { name: probe, containerPort: {{ .Values.manager.probePort }} }
+        livenessProbe:
+          httpGet: { path: /healthz, port: {{ .Values.manager.probePort }} }
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet: { path: /readyz, port: {{ .Values.manager.probePort }} }
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities: { drop: ["ALL"] }
+        resources:
+          {{- toYaml .Values.manager.resources | nindent 10 }}
+        volumeMounts:
+        - { name: inbox, mountPath: {{ .Values.destination.inboxPath }}, readOnly: true }
+        - { name: tmp, mountPath: /tmp }
+        {{- if $hasCreds }}
+        - { name: dest-creds, mountPath: /etc/snapback/dest-creds, readOnly: true }
+        {{- end }}
+      # --- peat-node receiver ---
       - name: peat-node
         image: "{{ .Values.peat.image.repository }}:{{ .Values.peat.image.tag }}"
         imagePullPolicy: {{ .Values.peat.image.pullPolicy }}
@@ -45,7 +106,7 @@ spec:
               name: {{ include "snapback.sharedKeySecretName" . }}
               key: shared-key
         - { name: PEAT_NODE_IROH_UDP_PORT, value: {{ .Values.peat.irohUdpPort | quote }} }
-        - { name: PEAT_NODE_ATTACHMENT_INBOX, value: "/var/lib/peat/inbox" }
+        - { name: PEAT_NODE_ATTACHMENT_INBOX, value: {{ .Values.destination.inboxPath | quote }} }
         - { name: PEAT_NODE_AUTO_SYNC, value: "true" }
         - { name: RUST_LOG, value: {{ .Values.peat.logLevel | quote }} }
         ports:
@@ -57,8 +118,15 @@ spec:
         resources:
           {{- toYaml .Values.peat.resources | nindent 10 }}
         volumeMounts:
-        - { name: inbox, mountPath: /var/lib/peat/inbox }
+        - { name: inbox, mountPath: {{ .Values.destination.inboxPath }} }
         - { name: peat-data, mountPath: /data/peat-node }
+      volumes:
+      - { name: tmp, emptyDir: {} }
+      {{- if $hasCreds }}
+      - name: dest-creds
+        secret:
+          secretName: {{ include "snapback.destCredsSecretName" . }}
+      {{- end }}
   volumeClaimTemplates:
   - metadata:
       name: inbox

@@ -133,6 +133,19 @@ type Client interface {
 	// not-found error; callers should re-SendAttachments (idempotent).
 	WaitBundle(ctx context.Context, bundleID string) ([]Progress, error)
 
+	// PutDocument creates or updates a CRDT document in a collection. The
+	// document is an opaque JSON blob that syncs to peers over the mesh
+	// (the "manifest plane", DESIGN §3.5). Idempotent: re-putting identical
+	// content is a no-op convergence.
+	PutDocument(ctx context.Context, collection, docID string, jsonData []byte) error
+
+	// GetDocument retrieves a document's JSON content by collection and id.
+	// The bool is false (and jsonData nil) when the document does not exist.
+	GetDocument(ctx context.Context, collection, docID string) (jsonData []byte, found bool, err error)
+
+	// ListDocuments returns the ids of every document in a collection.
+	ListDocuments(ctx context.Context, collection string) ([]string, error)
+
 	// Close releases the underlying connection.
 	Close() error
 }
