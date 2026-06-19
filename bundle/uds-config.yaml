@@ -6,7 +6,11 @@
 # These set the snapback package's Zarf variables (PEER_ID / PEER_ADDR), which
 # flow into the app chart's peat.peer.{id,addr} via values/common-values.yaml.
 #
-#   peer_addr — the OTHER copy's iroh ClusterIP Service DNS (host:udp-port).
+#   peer_addr — how this copy reaches the OTHER copy's iroh UDP endpoint.
+#               Same cluster: the OTHER copy's iroh ClusterIP Service DNS
+#               (<fullname>-iroh.<namespace>.svc.cluster.local:<udp-port>).
+#               Cross cluster: the OTHER cluster's iroh Envoy Gateway LoadBalancer
+#               address (host:udp-port) — requires peat.gateway.enabled there.
 #   peer_id   — the OTHER copy's endpoint id, derived OFFLINE before deploy. It's
 #               deterministic from the shared key + the peer's node id, which the
 #               chart pins to "snapback-<role>". With the dev key above:

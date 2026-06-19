@@ -81,6 +81,11 @@ packages:
             # bundles MUST set their own and deploy the SAME value to the destination.
             - path: peat.sharedKey
               value: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+            # Expose the iroh UDP endpoint through an Envoy Gateway LoadBalancer
+            # (the `envoy` package's udp-gateway-class). Required when the peer
+            # lives in another cluster; the peer dials this Gateway's LB address.
+            - path: peat.gateway.enabled
+              value: true
         uds-snapback-config:
           values:
             - path: role
@@ -102,6 +107,8 @@ packages:
               value: destination
             - path: peat.sharedKey
               value: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+            - path: peat.gateway.enabled
+              value: true
         uds-snapback-config:
           namespace: snapback-dest
           values:
