@@ -5,5 +5,5 @@ variables:
   snapback:
     # peat-node derive-id --node-id snapback-destination
     peer_id: "0a2fab29c6e443edd079ea939348a5f66b1d84403cbef92d5401cf5fd5a8879f"
-    # e.g. 192.168.78.1:51071
-    peer_addr: "192.168.1.24:51071"
+    # e.g. 192.168.78.1:51820
+    peer_addr: "192.168.1.24:51820"
