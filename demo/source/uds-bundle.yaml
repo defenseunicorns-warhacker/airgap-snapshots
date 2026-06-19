@@ -59,10 +59,6 @@ packages:
             - path: "deployNodeAgent"
               value: true
 
-  - name: envoy
-    repository: ghcr.io/uds-packages/envoy-gateway
-    ref: 1.7.1-uds.1-upstream
-
   # Snapback (source role)
   - name: snapback
     path: ../../
@@ -75,7 +71,7 @@ packages:
               value: source
             - path: peat.sharedKey
               value: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-            - path: peat.gateway.enabled
+            - path: peat.hostPort.enabled
               value: true
             - path: replicationPolicy.create
               value: true
@@ -86,3 +82,6 @@ packages:
           values:
             - path: role
               value: source
+            # Ship the RestrictHostPorts Exemption for the peat hostPort above.
+            - path: peat.hostPort.enabled
+              value: true

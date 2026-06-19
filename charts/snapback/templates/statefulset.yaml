@@ -114,7 +114,14 @@ spec:
         {{- if not $isSource }}
         - { name: grpc, containerPort: {{ .Values.peat.grpcPort }} }
         {{- end }}
+        {{- if .Values.peat.hostPort.enabled }}
+        # hostPort binds the iroh UDP port on the node so the k3d serverlb publish
+        # (host:<port> -> server-node:<port>) reaches the pod via CNI DNAT. Needed
+        # for cross-host peering on MetalLB clusters; gated by a Pepr Exemption.
+        - { name: iroh-quic, containerPort: {{ .Values.peat.irohUdpPort }}, hostPort: {{ .Values.peat.irohUdpPort }}, protocol: UDP }
+        {{- else }}
         - { name: iroh-quic, containerPort: {{ .Values.peat.irohUdpPort }}, protocol: UDP }
+        {{- end }}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities: { drop: ["ALL"] }

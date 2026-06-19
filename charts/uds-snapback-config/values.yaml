@@ -8,6 +8,12 @@ role: source
 peat:
   # Pinned Iroh UDP port; must match the app chart's peat.irohUdpPort.
   irohUdpPort: 51820
+  # Ships a Pepr Exemption for the RestrictHostPorts policy so the app chart's
+  # peat-node pod can bind the iroh UDP port via hostPort (cross-host peering on
+  # k3d+MetalLB clusters — see the app chart's peat.hostPort). MUST be set in
+  # lockstep with the app chart's peat.hostPort.enabled.
+  hostPort:
+    enabled: false
 
 manager:
   metricsPort: 8080
