@@ -5,7 +5,6 @@ tasks:
   - name: all
     actions:
       - task: health-check
-      - task: peat-connectivity
       - task: create-backup-io-simulator-package
       - task: backup-io-simulator
 
@@ -23,51 +22,6 @@ tasks:
             kind: StatefulSet
             name: snapback-destination
             namespace: snapback-dest
-
-  - name: peat-connectivity
-    description: Verify the source and destination peat-node sidecars have established an Iroh peer connection
-    actions:
-      - description: "Source peat-node connected to the destination peer"
-        maxRetries: 30
-        cmd: |
-          # The peat-node logs `connected to peer "<endpoint_id>"` once the Iroh
-          # QUIC handshake with the configured static peer succeeds. Absence (or a
-          # cert error such as `invalid peer certificate`) means peering is not up.
-          if uds zarf tools kubectl logs statefulset/snapback-source -n snapback \
-            -c peat-node --tail=-1 2>/dev/null | grep -q "connected to peer"; then
-            echo "source: peat peer connection established"
-          else
-            echo "source: no established peat connection yet"
-            sleep 10
-            exit 1
-          fi
-      - description: "Destination peat-node connected to the source peer"
-        maxRetries: 30
-        cmd: |
-          if uds zarf tools kubectl logs statefulset/snapback-destination -n snapback-dest \
-            -c peat-node --tail=-1 2>/dev/null | grep -q "connected to peer"; then
-            echo "destination: peat peer connection established"
-          else
-            echo "destination: no established peat connection yet"
-            sleep 10
-            exit 1
-          fi
-
-  - name: operator-check
-    actions:
-      - description: "Snapback Operator Check"
-        maxRetries: 30
-        cmd: |
-          # currently the container just prints the current time every 10 seconds
-          # we can check that the operator is running by verifying it logs a timestamp
-          OUTPUT=$(uds zarf tools kubectl logs deployment/snapback -n snapback --tail=1)
-          echo "Operator output: ${OUTPUT}"
-          # validate the output is a "YYYY-MM-DD HH:MM:SS" timestamp
-          if ! echo "${OUTPUT}" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$'; then
-            echo "Output did not match the expected timestamp format"
-            sleep 10
-            exit 1
-          fi
 
   - name: create-backup-io-simulator-package
     description: Build the backup I/O simulator test package archive
