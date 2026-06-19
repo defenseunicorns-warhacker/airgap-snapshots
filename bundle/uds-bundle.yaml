@@ -86,6 +86,19 @@ packages:
             # lives in another cluster; the peer dials this Gateway's LB address.
             - path: peat.gateway.enabled
               value: true
+            # Ship the ReplicationPolicy with the source package so the demo loop
+            # runs end to end from one deploy. target.* is intentionally left unset:
+            # it inherits the static peer (peat.peer.{id,addr} <- PEER_ID/PEER_ADDR
+            # in uds-config.yaml), so the policy and the sidecar peer share one
+            # source of truth. The selector scopes replication to the backups the
+            # backup-io-simulator Schedule produces (label app=backup-io-simulator,
+            # BSL "default" — which is replicationPolicy.backupStorageLocations'
+            # default), so every scheduled backup is shipped over peat.
+            - path: replicationPolicy.create
+              value: true
+            - path: replicationPolicy.backupSelector
+              value:
+                app: backup-io-simulator
         uds-snapback-config:
           values:
             - path: role
