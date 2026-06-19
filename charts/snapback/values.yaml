@@ -54,6 +54,15 @@ peat:
     enabled: false
     # GatewayClass provided by the `envoy` UDS package.
     className: udp-gateway-class
+  # Static cross-host peer (id@addr) for the local peat-node sidecar. Normally
+  # supplied at deploy time via the PEER_ID/PEER_ADDR Zarf vars (see
+  # values/common-values.yaml). When both are set the chart wires PEAT_NODE_PEERS
+  # and disables mDNS. For role=source with replicationPolicy.create=true these
+  # also seed the packaged policy's target (endpointID/addresses) so the policy
+  # and the sidecar peer share one source of truth. Empty => no static peer.
+  peer:
+    id: ""
+    addr: ""
   # Retain terminal-bundle handles long enough to outlast the worst-case DDIL
   # outage (7d). Sized against the outbox PVC.
   handleRetentionSecs: 604800
@@ -115,17 +124,20 @@ destination:
     relayURL: ""
 
 # Optionally have the chart create a ReplicationPolicy (source role only). Off by
-# default — usually authored after deploy once the destination's Iroh endpoint id
-# is known (see hack/m3/e2e.sh for how that id is discovered). Filling target.* and
-# setting create=true ships it as part of the package instead.
+# default. The destination's Iroh endpoint id is deterministic (derive-id from the
+# shared key + the peer's pinned node id), so it can be known before deploy: set
+# create=true to ship the policy with the package. When target.endpointID/addresses
+# are left empty they inherit the static peer (peat.peer.{id,addr} <- PEER_ID/
+# PEER_ADDR), so a single deploy-time knob configures both the policy and the
+# sidecar peer with no drift. Set target.* explicitly only to override that.
 replicationPolicy:
   create: false
   name: ""
   backupStorageLocations: ["default"]
   backupSelector: {}
   target:
-    endpointID: ""
-    addresses: []
+    endpointID: "" # empty => inherits peat.peer.id (PEER_ID)
+    addresses: [] # empty => inherits [peat.peer.addr] (PEER_ADDR)
     relayURL: ""
     nodeID: ""
   priority: Bulk
