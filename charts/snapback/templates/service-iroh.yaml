@@ -1,0 +1,24 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+# ClusterIP Service for the iroh UDP/QUIC endpoint. The StatefulSet's governing
+# Service (service.yaml) is headless for stable per-pod DNS; this one gives a
+# stable virtual IP + DNS name that an in-cluster peer dials. When source and
+# destination run in the same cluster, use this Service's DNS as the OTHER side's
+# peat.peer.addr:
+#   <fullname>-iroh.<namespace>.svc.cluster.local:<irohUdpPort>
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "snapback.fullname" . }}-iroh
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "snapback.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "snapback.selectorLabels" . | nindent 4 }}
+  ports:
+  - name: iroh-quic
+    port: {{ .Values.peat.irohUdpPort }}
+    targetPort: iroh-quic
+    protocol: UDP

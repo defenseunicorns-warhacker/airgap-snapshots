@@ -43,6 +43,17 @@ peat:
   existingSharedKeySecret: ""
   irohUdpPort: 51820
   grpcPort: 50051
+  # Cross-cluster UDP exposure via Envoy Gateway (Gateway API). Istio (UDS Core's
+  # default mesh) has no UDP support, so when source and destination live in
+  # DIFFERENT clusters their iroh endpoints must be reachable at a routable LB
+  # address. Enabling this creates a dedicated Gateway (own LoadBalancer IP) on the
+  # iroh UDP port + a UDPRoute to the iroh Service; the other cluster dials that LB
+  # address (set as its peat.peer.addr). Off by default — same-cluster peering uses
+  # the iroh ClusterIP Service DNS directly and needs no Gateway.
+  gateway:
+    enabled: false
+    # GatewayClass provided by the `envoy` UDS package.
+    className: udp-gateway-class
   # Retain terminal-bundle handles long enough to outlast the worst-case DDIL
   # outage (7d). Sized against the outbox PVC.
   handleRetentionSecs: 604800

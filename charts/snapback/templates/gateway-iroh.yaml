@@ -1,0 +1,31 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+{{- if .Values.peat.gateway.enabled }}
+# Dedicated Envoy Gateway for the iroh QUIC (UDP) endpoint. UDS Core's default
+# mesh (Istio) has no UDP support, so cross-cluster iroh traffic is exposed via the
+# Gateway API + Envoy Gateway (the `envoy` UDS package's udp-gateway-class). Each
+# release gets its OWN Gateway -> its OWN LoadBalancer IP on the iroh UDP port; the
+# peer in the other cluster dials that LB address as its peat.peer.addr. (A single
+# shared Gateway can't serve two copies: UDP listeners route purely by port, so two
+# UDPRoutes on one listener are ambiguous.)
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ include "snapback.fullname" . }}-iroh
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "snapback.labels" . | nindent 4 }}
+spec:
+  gatewayClassName: {{ .Values.peat.gateway.className }}
+  listeners:
+  - name: iroh-quic
+    protocol: UDP
+    port: {{ .Values.peat.irohUdpPort }}
+    allowedRoutes:
+      kinds:
+      - group: gateway.networking.k8s.io
+        kind: UDPRoute
+      # Only the UDPRoute in this release's namespace may attach.
+      namespaces:
+        from: Same
+{{- end }}
