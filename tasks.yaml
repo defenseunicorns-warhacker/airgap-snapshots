@@ -30,8 +30,6 @@ tasks:
   - name: create-deploy-test-bundle
     description: Test and validate cluster is deployed with the package
     actions:
-      - cmd: |
-          cp zarf-package-snapback-*-upstream.tar.zst ./snapback-destination.tar.zst
       - task: create:test-bundle
       - task: deploy:test-bundle
       - task: setup:keycloak-user
@@ -41,8 +39,6 @@ tasks:
     description: Create and deploy the bundle on an existing cluster (for iteration/dev speed)
     actions:
       - task: create-dev-package
-      - cmd: |
-          cp zarf-package-snapback-*-upstream.tar.zst snapback-destination.tar.zst
       - task: create:test-bundle
       - task: deploy:test-bundle
 
