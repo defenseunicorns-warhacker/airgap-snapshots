@@ -1,0 +1,22 @@
+# Public Domain
+# SPDX-License-Identifier: Public-Domain
+
+{{- $sched := .Values.veleroBackupSchedule }}
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: {{$sched.name}}
+  namespace: {{$sched.namespace}}
+spec:
+  schedule: {{$sched.schedule | quote}}
+  template:
+    includedNamespaces:
+      {{- toYaml $sched.includedNamespaces | nindent 6 }}
+    includedResources:
+      {{- toYaml $sched.includedResources | nindent 6 }}
+    snapshotVolumes: {{$sched.snapshotVolumes}}
+    defaultVolumesToFsBackup: {{$sched.defaultVolumesToFsBackup}}
+    ttl: {{$sched.ttl}}
+    metadata:
+      labels:
+        {{- toYaml $sched.labels | nindent 8 }}
