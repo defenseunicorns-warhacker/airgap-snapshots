@@ -29,7 +29,7 @@ simulator:
 veleroBackupSchedule:
   name: backup-io-simulator-schedule
   namespace: velero
-  schedule: "*/5 * * * *"
+  schedule: "*/2 * * * *"
   includedNamespaces:
     - backup-io-simulator
   includedResources:
