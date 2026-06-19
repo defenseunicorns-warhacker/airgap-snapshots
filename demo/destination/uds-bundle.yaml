@@ -64,7 +64,7 @@ packages:
   # Snapback (destination role)
   - name: snapback
     path: ../../
-    ref: dev
+    ref: dev-upstream
     overrides:
       snapback:
         snapback:

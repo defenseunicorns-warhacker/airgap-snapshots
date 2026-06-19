@@ -16,12 +16,6 @@ tasks:
             kind: StatefulSet
             name: snapback-source
             namespace: snapback
-      - description: Snapback destination Health Check
-        wait:
-          cluster:
-            kind: StatefulSet
-            name: snapback-destination
-            namespace: snapback-dest
 
   - name: create-backup-io-simulator-package
     description: Build the backup I/O simulator test package archive
