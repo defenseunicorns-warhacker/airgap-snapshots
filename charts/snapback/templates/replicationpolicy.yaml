@@ -2,12 +2,26 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
 {{- if and (eq .Values.role "source") .Values.replicationPolicy.create }}
 {{- $rp := .Values.replicationPolicy }}
-{{- if not $rp.target.endpointID }}
-{{- fail "snapback: replicationPolicy.create=true requires replicationPolicy.target.endpointID (the destination's Iroh endpoint id)" }}
+{{- /*
+The destination identity has a single source of truth: the PEER_ID/PEER_ADDR Zarf
+vars (peat.peer.{id,addr}) that also wire the peat-node static peer. Inherit them
+here so the packaged policy and the sidecar peer can't drift and the whole thing is
+configurable at deploy time from PEER_ID/PEER_ADDR alone. An explicit
+replicationPolicy.target.{endpointID,addresses} still wins when set.
+*/}}
+{{- $endpointID := $rp.target.endpointID | default .Values.peat.peer.id }}
+{{- $addresses := $rp.target.addresses }}
+{{- if and (empty $addresses) .Values.peat.peer.addr }}
+{{- $addresses = list .Values.peat.peer.addr }}
 {{- end }}
-# Optional packaged ReplicationPolicy. Usually authored post-deploy once the
-# destination's Iroh endpoint id is known; set replicationPolicy.create=true to
-# ship it with the package instead. Cluster-scoped.
+{{- if not $endpointID }}
+{{- fail "snapback: replicationPolicy.create=true requires a destination Iroh endpoint id — set replicationPolicy.target.endpointID or the PEER_ID Zarf var (peat.peer.id)" }}
+{{- end }}
+# Optional packaged ReplicationPolicy. The destination's Iroh endpoint id is
+# deterministic (derive-id from the shared key + the peer's pinned node id), so it
+# can be known before deploy — set replicationPolicy.create=true to ship the policy
+# with the package, configured from the same PEER_ID/PEER_ADDR vars as the static
+# peer. Cluster-scoped.
 apiVersion: snapback.uds.dev/v1alpha1
 kind: ReplicationPolicy
 metadata:
@@ -22,8 +36,8 @@ spec:
     matchLabels:
       {{- toYaml $rp.backupSelector | nindent 6 }}
   target:
-    endpointID: {{ $rp.target.endpointID | quote }}
-    {{- with $rp.target.addresses }}
+    endpointID: {{ $endpointID | quote }}
+    {{- with $addresses }}
     addresses:
       {{- toYaml . | nindent 6 }}
     {{- end }}
