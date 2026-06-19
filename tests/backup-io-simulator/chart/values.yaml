@@ -31,12 +31,12 @@ veleroBackupSchedule:
   namespace: velero
   schedule: "*/5 * * * *"
   includedNamespaces:
-    - default
+    - backup-io-simulator
   includedResources:
     - persistentvolumeclaims
     - persistentvolumes
-  snapshotVolumes: true
-  defaultVolumesToFsBackup: false
+  snapshotVolumes: false
+  defaultVolumesToFsBackup: true
   ttl: 0h10m
   labels:
     app: backup-io-simulator
