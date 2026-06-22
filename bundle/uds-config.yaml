@@ -1,8 +1,8 @@
 # Copyright 2024 Defense Unicorns
 # SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
 
-variables:
-  snapback:
-    # derive-id --node-id snapback-destination
-    peer_id: "0a2fab29c6e443edd079ea939348a5f66b1d84403cbef92d5401cf5fd5a8879f"
-    peer_addr: "host.docker.internal:51820"
+# This single-cluster dev bundle deploys BOTH roles, so the peat peer config can't
+# be expressed as package-level Zarf vars (both instances share the package name
+# "snapback"). Each role's peer.id / peer.addr is set directly in the per-instance
+# overrides in uds-bundle.yaml instead — nothing to configure here.
+variables: {}
