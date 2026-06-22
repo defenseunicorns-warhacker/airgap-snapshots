@@ -7,6 +7,8 @@ tasks:
       - task: health-check
       - task: create-backup-io-simulator-package
       - task: backup-io-simulator
+      - task: peat-connected
+      - task: backup-replicated
 
   - name: health-check
     actions:
@@ -88,5 +90,35 @@ tasks:
 
           if [ "${AFTER}" -le "${BEFORE}" ]; then
             echo "PVC usage did not grow; expected active writes"
+            exit 1
+          fi
+
+  - name: peat-connected
+    description: Verify the source peat-node has an established connection to the destination peer
+    actions:
+      - description: "Source peat-node connected to destination peer"
+        maxRetries: 12
+        cmd: |
+          if uds zarf tools kubectl logs snapback-0 -n snapback-source -c peat-node \
+              | grep -q "connected to peer"; then
+            echo "peat connection established"
+          else
+            echo "no 'connected to peer' in source peat-node logs yet"
+            sleep 10
+            exit 1
+          fi
+
+  - name: backup-replicated
+    description: Verify at least one backup-io-simulator attachment has landed in the destination inbox
+    actions:
+      - description: "backup-io-simulator backup received in destination inbox"
+        maxRetries: 24
+        cmd: |
+          if uds zarf tools kubectl logs snapback-0 -n snapback-destination -c peat-node \
+              | grep -q "attachment written to inbox.*backup-io-simulator"; then
+            echo "backup-io-simulator backup replicated to destination"
+          else
+            echo "no backup-io-simulator attachment in destination inbox yet"
+            sleep 10
             exit 1
           fi
