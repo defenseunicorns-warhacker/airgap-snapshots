@@ -86,7 +86,7 @@ spec:
         - { name: PEAT_NODE_LISTEN, value: "tcp://0.0.0.0:{{ .Values.peat.grpcPort }}" }
         {{- end }}
         - { name: PEAT_NODE_DATA_DIR, value: "/data/peat-node" }
-        - { name: PEAT_NODE_NODE_ID, value: {{ include "snapback.fullname" . | quote }} }
+        - { name: PEAT_NODE_NODE_ID, value: {{ include "snapback.nodeId" . | quote }} }
         - { name: PEAT_NODE_APP_ID, value: {{ .Values.peat.appId | quote }} }
         - name: PEAT_NODE_SHARED_KEY
           valueFrom:

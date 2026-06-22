@@ -9,7 +9,7 @@
 apiVersion: uds.dev/v1alpha1
 kind: Exemption
 metadata:
-  name: snapback-{{ .Values.role }}-hostport
+  name: snapback-{{ .Release.Namespace }}-hostport
   namespace: uds-policy-exemptions
 spec:
   exemptions:
@@ -17,7 +17,7 @@ spec:
         - RestrictHostPorts
       matcher:
         namespace: {{ .Release.Namespace }}
-        name: "^snapback-{{ .Values.role }}.*"
+        name: "^snapback.*"
         kind: pod
       title: "peat-node iroh UDP hostPort"
       description:

@@ -95,7 +95,7 @@ packages:
             - path: peat.peer.id
               value: "0a2fab29c6e443edd079ea939348a5f66b1d84403cbef92d5401cf5fd5a8879f"
             - path: peat.peer.addr
-              value: "snapback-destination-iroh.snapback-destination.svc.cluster.local:51820"
+              value: "snapback-iroh.snapback-destination.svc.cluster.local:51820"
             # Ship the ReplicationPolicy with the source package so the demo loop
             # runs end to end from one deploy. target.* is intentionally left unset:
             # it inherits the static peer (peat.peer.{id,addr} above), so the policy
@@ -133,7 +133,7 @@ packages:
             - path: peat.peer.id
               value: "0b237433b931cd321711e81052a4d09cd93b8ee84d2ec5e4a8c78e82bced634d"
             - path: peat.peer.addr
-              value: "snapback-source-iroh.snapback-source.svc.cluster.local:51820"
+              value: "snapback-iroh.snapback-source.svc.cluster.local:51820"
         uds-snapback-config:
           values:
             - path: role

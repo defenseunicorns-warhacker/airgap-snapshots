@@ -10,12 +10,18 @@ tasks:
 
   - name: health-check
     actions:
-      - description: Snapback source Health Check
+      - description: Snapback Source Health Check
         wait:
           cluster:
             kind: StatefulSet
-            name: snapback-source
-            namespace: snapback
+            name: snapback
+            namespace: snapback-source
+      - description: Snapback Destination Health Check
+        wait:
+          cluster:
+            kind: StatefulSet
+            name: snapback
+            namespace: snapback-destination
 
   - name: create-backup-io-simulator-package
     description: Build the backup I/O simulator test package archive
