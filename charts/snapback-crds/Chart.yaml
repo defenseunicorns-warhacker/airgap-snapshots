@@ -1,0 +1,9 @@
+# Copyright 2024 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+
+apiVersion: v2
+name: snapback-crds
+description: Custom resource definitions for the snapback operator.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

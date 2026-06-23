@@ -33,6 +33,15 @@ variables:
     default: ""
 
 components:
+  - name: snapback-crds
+    required: true
+    only:
+      flavor: upstream
+    charts:
+      - name: snapback-crds
+        namespace: snapback-crds
+        version: 0.1.0
+        localPath: charts/snapback-crds/
   - name: snapback
     required: true
     only:
@@ -52,8 +61,6 @@ components:
         localPath: charts/snapback/
         valuesFiles:
           - values/common-values.yaml
-    # We ignore health checks due to a bug where namespace overrides are not respected.
-    healthChecks: []
     actions:
       onCreate:
         before:

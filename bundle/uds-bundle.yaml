@@ -73,10 +73,15 @@ packages:
     ref: dev
     # [Alpha] Override the namespace for the whole package. Lets the same package
     # deploy twice in one cluster (source + destination) without colliding.
-    namespace: snapback-source
     overrides:
       snapback:
+        uds-snapback-config:
+          namespace: snapback-source
+          values:
+            - path: role
+              value: source
         snapback:
+          namespace: snapback-source
           values:
             - path: role
               value: source
@@ -107,19 +112,20 @@ packages:
             - path: replicationPolicy.backupSelector
               value:
                 app: backup-io-simulator
-        uds-snapback-config:
-          values:
-            - path: role
-              value: source
 
   # Destination (receive-side) copy — deployed into "snapback-destination".
   - name: snapback-destination
     path: ../zarf-package-snapback-destination.tar.zst
     ref: dev
-    namespace: snapback-destination
     overrides:
       snapback:
+        uds-snapback-config:
+          namespace: snapback-destination
+          values:
+            - path: role
+              value: destination
         snapback:
+          namespace: snapback-destination
           values:
             - path: role
               value: destination
@@ -134,7 +140,3 @@ packages:
               value: "0b237433b931cd321711e81052a4d09cd93b8ee84d2ec5e4a8c78e82bced634d"
             - path: peat.peer.addr
               value: "snapback-iroh.snapback-source.svc.cluster.local:51820"
-        uds-snapback-config:
-          values:
-            - path: role
-              value: destination
