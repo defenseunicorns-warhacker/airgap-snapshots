@@ -1,32 +1,8 @@
 # Copyright 2024 Defense Unicorns
 # SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
-# Bundle-level config overrides (required by uds-common tasks; may be empty).
-#
-# Peer wiring for the two same-cluster copies (keyed by bundle package name).
-# These set the snapback package's Zarf variables (PEER_ID / PEER_ADDR), which
-# flow into the app chart's peat.peer.{id,addr} via values/common-values.yaml.
-#
-#   peer_addr — how this copy reaches the OTHER copy's iroh UDP endpoint.
-#               Same cluster: the OTHER copy's iroh ClusterIP Service DNS
-#               (<fullname>-iroh.<namespace>.svc.cluster.local:<udp-port>).
-#               Cross cluster: the OTHER cluster's iroh Envoy Gateway LoadBalancer
-#               address (host:udp-port) — requires peat.gateway.enabled there.
-#   peer_id   — the OTHER copy's endpoint id, derived OFFLINE before deploy. It's
-#               deterministic from the shared key + the peer's node id, which the
-#               chart pins to "snapback-<role>". With the dev key above:
-#                 peat-node derive-id \
-#                   --shared-key AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= \
-#                   --node-id snapback-destination   # -> snapback.peer_id
-#                 peat-node derive-id \
-#                   --shared-key AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= \
-#                   --node-id snapback-source        # -> snapback-destination.peer_id
-#
-# Until peer_id is filled, the chart leaves PEAT_NODE_PEERS unset (no static
-# peering) — fill both ids, then redeploy to enable cross-copy delivery.
-variables:
-  snapback: # source copy (namespace: snapback) -> dials destination
-    peer_id: "0a2fab29c6e443edd079ea939348a5f66b1d84403cbef92d5401cf5fd5a8879f" # derive-id --node-id snapback-destination
-    peer_addr: "snapback-destination-iroh.snapback-dest.svc.cluster.local:51820"
-  snapback-destination: # destination copy (namespace: snapback-dest) -> dials source
-    peer_id: "0b237433b931cd321711e81052a4d09cd93b8ee84d2ec5e4a8c78e82bced634d" # derive-id --node-id snapback-source
-    peer_addr: "snapback-source-iroh.snapback.svc.cluster.local:51820"
+
+# This single-cluster dev bundle deploys BOTH roles, so the peat peer config can't
+# be expressed as package-level Zarf vars (both instances share the package name
+# "snapback"). Each role's peer.id / peer.addr is set directly in the per-instance
+# overrides in uds-bundle.yaml instead — nothing to configure here.
+variables: {}

@@ -5,88 +5,68 @@ tasks:
   - name: all
     actions:
       - task: health-check
-      - task: create-backup-io-simulator-package
-      - task: backup-io-simulator
+      - task: deploy-backup-io-simulator
+      - task: peat-connected
+      - task: backup-replicated
 
   - name: health-check
     actions:
-      - description: Snapback source Health Check
+      - description: Snapback Source Health Check
         wait:
           cluster:
             kind: StatefulSet
-            name: snapback-source
-            namespace: snapback
-      - description: Snapback destination Health Check
+            name: snapback
+            namespace: snapback-source
+      - description: Snapback Destination Health Check
         wait:
           cluster:
             kind: StatefulSet
-            name: snapback-destination
-            namespace: snapback-dest
+            name: snapback
+            namespace: snapback-destination
 
-  - name: create-backup-io-simulator-package
-    description: Build the backup I/O simulator test package archive
+  - name: deploy-backup-io-simulator
+    description: Build and deploy the backup I/O simulator, then wait for it to start writing
     actions:
-      - description: Create backup-io-simulator package archive
+      - description: Create backup-io-simulator package
         dir: tests/backup-io-simulator
-        cmd: |
-          uds zarf package create --confirm --skip-sbom
-      - description: Deploy backup-io-simulator package archive
+        cmd: uds zarf package create --confirm --skip-sbom
+      - description: Deploy backup-io-simulator package
         dir: tests/backup-io-simulator
-        cmd: |
-          uds zarf package deploy --confirm zarf-package-backup-io-simulator-*.tar.zst
-
-  - name: backup-io-simulator
-    actions:
-      - description: "Deploy backup I/O simulator workload"
-        maxRetries: 30
-        cmd: |
-          NS=$(uds zarf tools kubectl get pod --all-namespaces \
-            -o jsonpath='{range .items[?(@.metadata.name=="backup-io-simulator")]}{.metadata.namespace}{"\n"}{end}' \
-            | head -n1)
-
-          if [ -z "${NS}" ]; then
-            echo "backup-io-simulator pod not found yet"
-            sleep 10
-            exit 1
-          fi
-
-          uds zarf tools kubectl wait --for=condition=Ready pod/backup-io-simulator \
-            -n "${NS}" --timeout=120s
-      - description: "Verify backup I/O simulator PVC is receiving data"
+        cmd: uds zarf package deploy --confirm zarf-package-backup-io-simulator-*.tar.zst
+      - description: Wait for backup-io-simulator pod to be ready
+        wait:
+          cluster:
+            kind: Pod
+            name: backup-io-simulator
+            namespace: backup-io-simulator
+            condition: Ready
+      - description: Verify backup-io-simulator PVC is receiving data
         maxRetries: 12
         cmd: |
-          WAIT_SECONDS=15
+          BEFORE=$(uds zarf tools kubectl exec pod/backup-io-simulator \
+            -n backup-io-simulator -c log-append-simulator \
+            -- sh -c 'du -sb /data 2>/dev/null | awk "{print \$1}"')
+          sleep 15
+          AFTER=$(uds zarf tools kubectl exec pod/backup-io-simulator \
+            -n backup-io-simulator -c log-append-simulator \
+            -- sh -c 'du -sb /data 2>/dev/null | awk "{print \$1}"')
+          echo "PVC bytes: before=${BEFORE} after=${AFTER}"
+          [ "${AFTER}" -gt "${BEFORE}" ]
 
-          NS=$(uds zarf tools kubectl get pod --all-namespaces \
-            -o jsonpath='{range .items[?(@.metadata.name=="backup-io-simulator")]}{.metadata.namespace}{"\n"}{end}' \
-            | head -n1)
+  - name: peat-connected
+    description: Verify the source peat-node has an established connection to the destination peer
+    actions:
+      - description: Source peat-node connected to destination peer
+        maxRetries: 12
+        cmd: |
+          uds zarf tools kubectl logs snapback-0 -n snapback-source -c peat-node \
+            | grep -q "connected to peer" || { sleep 10; exit 1; }
 
-          if [ -z "${NS}" ]; then
-            echo "backup-io-simulator pod not found"
-            exit 1
-          fi
-
-          if ! uds zarf tools kubectl get pvc test-io-pvc -n "${NS}" >/dev/null 2>&1; then
-            echo "PVC test-io-pvc not found in namespace ${NS}"
-            exit 1
-          fi
-
-          BEFORE=$(uds zarf tools kubectl exec pod/backup-io-simulator -n "${NS}" \
-            -c log-append-simulator -- sh -c 'du -sb /data 2>/dev/null | awk "{print \$1}"')
-
-          sleep "${WAIT_SECONDS}"
-
-          AFTER=$(uds zarf tools kubectl exec pod/backup-io-simulator -n "${NS}" \
-            -c log-append-simulator -- sh -c 'du -sb /data 2>/dev/null | awk "{print \$1}"')
-
-          echo "PVC bytes in ${NS}: before=${BEFORE} after=${AFTER}"
-
-          if [ -z "${BEFORE}" ] || [ -z "${AFTER}" ]; then
-            echo "Unable to read PVC usage from /data"
-            exit 1
-          fi
-
-          if [ "${AFTER}" -le "${BEFORE}" ]; then
-            echo "PVC usage did not grow; expected active writes"
-            exit 1
-          fi
+  - name: backup-replicated
+    description: Verify at least one backup-io-simulator attachment has landed in the destination inbox
+    actions:
+      - description: backup-io-simulator backup received in destination inbox
+        maxRetries: 24
+        cmd: |
+          uds zarf tools kubectl logs snapback-0 -n snapback-destination -c peat-node \
+            | grep -q "attachment written to inbox.*backup-io-simulator" || { sleep 10; exit 1; }

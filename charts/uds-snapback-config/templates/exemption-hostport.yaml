@@ -1,0 +1,28 @@
+# Copyright 2025 Defense Unicorns
+# SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commercial
+{{- if .Values.peat.hostPort.enabled }}
+# UDS Core's RestrictHostPorts policy blocks the hostPort the app chart's peat-node
+# pod needs to expose its iroh UDP endpoint on the node (k3d serverlb publishes
+# host:<port> -> node:<port>, but MetalLB binds no node hostPort, so without this
+# the published QUIC datagrams are dropped). Exempt only this release's pods, only
+# that one policy. Keep in lockstep with the app chart's peat.hostPort.enabled.
+apiVersion: uds.dev/v1alpha1
+kind: Exemption
+metadata:
+  name: snapback-{{ .Release.Namespace }}-hostport
+  namespace: uds-policy-exemptions
+spec:
+  exemptions:
+    - policies:
+        - RestrictHostPorts
+      matcher:
+        namespace: {{ .Release.Namespace }}
+        name: "^snapback.*"
+        kind: pod
+      title: "peat-node iroh UDP hostPort"
+      description:
+        "Binds host UDP {{ .Values.peat.irohUdpPort }} so the k3d serverlb publish
+        reaches the iroh endpoint cross-host. MetalLB (UDS Core's load balancer)
+        provides no node hostPort path, so the published UDP datagrams are
+        otherwise dropped before reaching the pod."
+{{- end }}

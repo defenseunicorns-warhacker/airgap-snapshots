@@ -4,12 +4,18 @@
 kind: UDSBundle
 metadata:
   name: snapback-test
-  description: A UDS bundle for deploying Snapback (source role) and its dependencies on a dev cluster
+  description: >-
+    Single-cluster dev bundle: deploys BOTH the source and destination roles of
+    Snapback into separate namespaces (snapback-source / snapback-destination) so
+    the full replication loop runs end to end on one cluster. The two peat-node
+    sidecars peer over the in-cluster iroh ClusterIP Service DNS (no hostPort /
+    Gateway needed — that's only for cross-HOST peering).
   version: dev
 
 packages:
   # Velero (+ MinIO BSL) so Snapback has a real BSL to read. The BSL config matches
   # what the operator + objstore were validated against (uds-dev-stack MinIO).
+  # Deployed once and shared by the source role.
   - name: core-backup-restore
     repository: ghcr.io/defenseunicorns/packages/uds/core-backup-restore
     ref: 1.6.0-registry1
@@ -60,70 +66,77 @@ packages:
             # - path: "deployNodeAgent"
             #   value: true
 
-  - name: envoy
-    repository: ghcr.io/uds-packages/envoy-gateway
-    ref: 1.7.1-uds.1-upstream
-
-  # Source (send-side) copy — deploys into the default "snapback" namespace.
+  # Source (send-side) copy — deployed into its own "snapback-source" namespace via
+  # the package-level namespace override (applies to both charts in the package).
   - name: snapback
     path: ../
     ref: dev
+    # [Alpha] Override the namespace for the whole package. Lets the same package
+    # deploy twice in one cluster (source + destination) without colliding.
     overrides:
       snapback:
+        uds-snapback-config:
+          namespace: snapback-source
+          values:
+            - path: role
+              value: source
         snapback:
+          namespace: snapback-source
           values:
             - path: role
               value: source
             # Always pull the just-in-time built dev image.
             - path: image.pullPolicy
               value: Always
-            # DEV-ONLY throwaway Iroh shared key (32 zero bytes, base64). Production
-            # bundles MUST set their own and deploy the SAME value to the destination.
+            # DEV-ONLY throwaway Iroh shared key (32 zero bytes, base64). The SAME
+            # value MUST be on both roles — it (plus the node id) deterministically
+            # derives each side's iroh endpoint id (see peat.peer.id below).
             - path: peat.sharedKey
               value: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-            # Expose the iroh UDP endpoint through an Envoy Gateway LoadBalancer
-            # (the `envoy` package's udp-gateway-class). Required when the peer
-            # lives in another cluster; the peer dials this Gateway's LB address.
-            - path: peat.gateway.enabled
-              value: true
+            # Static peer = the destination, reachable in-cluster at its iroh
+            # ClusterIP Service DNS. peer.id is the destination's endpoint id,
+            # derived offline: peat-node derive-id --shared-key <key> \
+            #   --node-id snapback-destination
+            - path: peat.peer.id
+              value: "0a2fab29c6e443edd079ea939348a5f66b1d84403cbef92d5401cf5fd5a8879f"
+            - path: peat.peer.addr
+              value: "snapback-iroh.snapback-destination.svc.cluster.local:51820"
             # Ship the ReplicationPolicy with the source package so the demo loop
             # runs end to end from one deploy. target.* is intentionally left unset:
-            # it inherits the static peer (peat.peer.{id,addr} <- PEER_ID/PEER_ADDR
-            # in uds-config.yaml), so the policy and the sidecar peer share one
-            # source of truth. The selector scopes replication to the backups the
-            # backup-io-simulator Schedule produces (label app=backup-io-simulator,
-            # BSL "default" — which is replicationPolicy.backupStorageLocations'
-            # default), so every scheduled backup is shipped over peat.
+            # it inherits the static peer (peat.peer.{id,addr} above), so the policy
+            # and the sidecar peer share one source of truth. The selector scopes
+            # replication to the backups the backup-io-simulator Schedule produces
+            # (label app=backup-io-simulator, BSL "default").
             - path: replicationPolicy.create
               value: true
             - path: replicationPolicy.backupSelector
               value:
                 app: backup-io-simulator
-        uds-snapback-config:
-          values:
-            - path: role
-              value: source
 
-  # Destination (receive-side) copy — the SAME Zarf package deployed a second time
-  # under a unique bundle name + a namespace override (snapback-dest). role flips
-  # the workloads to receiver-only; peer wiring (peat.peer.id/addr) is set per copy
-  # in uds-config.yaml. Same shared key as the source.
+  # Destination (receive-side) copy — deployed into "snapback-destination".
   - name: snapback-destination
-    path: ../snapback-destination.tar.zst
+    path: ../zarf-package-snapback-destination.tar.zst
     ref: dev
     overrides:
       snapback:
-        snapback:
-          namespace: snapback-dest
+        uds-snapback-config:
+          namespace: snapback-destination
           values:
             - path: role
               value: destination
+        snapback:
+          namespace: snapback-destination
+          values:
+            - path: role
+              value: destination
+            - path: image.pullPolicy
+              value: Always
             - path: peat.sharedKey
               value: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-            - path: peat.gateway.enabled
-              value: true
-        uds-snapback-config:
-          namespace: snapback-dest
-          values:
-            - path: role
-              value: destination
+            # Static peer = the source, reachable in-cluster at its iroh ClusterIP
+            # Service DNS. peer.id is the source's endpoint id, derived offline:
+            #   peat-node derive-id --shared-key <key> --node-id snapback-source
+            - path: peat.peer.id
+              value: "0b237433b931cd321711e81052a4d09cd93b8ee84d2ec5e4a8c78e82bced634d"
+            - path: peat.peer.addr
+              value: "snapback-iroh.snapback-source.svc.cluster.local:51820"

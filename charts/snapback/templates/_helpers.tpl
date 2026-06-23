@@ -8,12 +8,29 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Defense-Unicorns-Commer
 {{- end -}}
 
 {{/*
-Fullname is role-suffixed so a source and a destination release can coexist in a
-namespace (and so the stable pod DNS reflects the role).
+Fullname is role-agnostic — each role lives in its own namespace, so there is no
+collision risk for namespace-scoped resources.
 */}}
 {{- define "snapback.fullname" -}}
-{{- $name := default .Chart.Name .Values.nameOverride -}}
-{{- printf "%s-%s" $name .Values.role | trunc 63 | trimSuffix "-" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+Node ID passed to peat-node as PEAT_NODE_APP_ID. Includes the role so that source
+and destination derive distinct iroh endpoint IDs from the same shared key
+(endpoint_id = derive-id(sharedKey, nodeId) — must differ across the two roles).
+*/}}
+{{- define "snapback.nodeId" -}}
+{{- printf "%s-%s" (default .Chart.Name .Values.nameOverride) .Values.role | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+ClusterRole / ClusterRoleBinding name. Cluster-scoped, so it must be unique even
+when both roles deploy to the same cluster. Append the release namespace (which
+is per-role with namespace overrides) to guarantee uniqueness.
+*/}}
+{{- define "snapback.clusterRoleName" -}}
+{{- printf "%s-manager" .Release.Namespace | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{- define "snapback.labels" -}}

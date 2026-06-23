@@ -43,17 +43,19 @@ peat:
   existingSharedKeySecret: ""
   irohUdpPort: 51820
   grpcPort: 50051
-  # Cross-cluster UDP exposure via Envoy Gateway (Gateway API). Istio (UDS Core's
-  # default mesh) has no UDP support, so when source and destination live in
-  # DIFFERENT clusters their iroh endpoints must be reachable at a routable LB
-  # address. Enabling this creates a dedicated Gateway (own LoadBalancer IP) on the
-  # iroh UDP port + a UDPRoute to the iroh Service; the other cluster dials that LB
-  # address (set as its peat.peer.addr). Off by default — same-cluster peering uses
-  # the iroh ClusterIP Service DNS directly and needs no Gateway.
-  gateway:
+  # Cross-HOST peering exposure: bind the iroh UDP port directly on the node via a
+  # pod hostPort. Required when source and destination live in DIFFERENT clusters
+  # on k3d (UDS Core's setup): k3d's serverlb publishes host:<port> ->
+  # server-node:<port>, but MetalLB (not klipper servicelb) binds NO node hostPort,
+  # so without this the published UDP datagrams hit a dead port and are dropped. A
+  # hostPort makes the CNI install a node:<port> -> pod DNAT, closing the path so
+  # serverlb's publish reaches the iroh endpoint. UDS Core's RestrictHostPorts
+  # policy blocks host ports, so the uds-snapback-config chart ships a matching Pepr
+  # Exemption (keep peat.hostPort.enabled in lockstep across both charts). Off by
+  # default; enable per-cluster for cross-host peering. Same-cluster peering needs
+  # none of this — peers dial the iroh ClusterIP Service DNS directly.
+  hostPort:
     enabled: false
-    # GatewayClass provided by the `envoy` UDS package.
-    className: udp-gateway-class
   # Static cross-host peer (id@addr) for the local peat-node sidecar. Normally
   # supplied at deploy time via the PEER_ID/PEER_ADDR Zarf vars (see
   # values/common-values.yaml). When both are set the chart wires PEAT_NODE_PEERS
