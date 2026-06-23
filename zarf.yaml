@@ -52,6 +52,8 @@ components:
         localPath: charts/snapback/
         valuesFiles:
           - values/common-values.yaml
+    # We ignore health checks due to a bug where namespace overrides are not respected.
+    healthChecks: []
     actions:
       onCreate:
         before:
